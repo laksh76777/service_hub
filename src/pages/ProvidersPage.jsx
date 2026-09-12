@@ -12,7 +12,7 @@ const ProvidersPage = () => {
   const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [zipCode, setZipCode] = useState('');
+  const [pincode, setPincode] = useState('');
   const [minRating, setMinRating] = useState('0');
   const [loading, setLoading] = useState(true);
 
@@ -21,13 +21,16 @@ const ProvidersPage = () => {
     try {
       const search = overrides.search !== undefined ? overrides.search : searchTerm;
       const cat = overrides.category !== undefined ? overrides.category : selectedCategory;
-      const zip = overrides.zipCode !== undefined ? overrides.zipCode : zipCode;
+      const pin = overrides.pincode !== undefined ? overrides.pincode : pincode;
       const rating = overrides.minRating !== undefined ? overrides.minRating : minRating;
 
       const params = {};
       if (search && search.trim()) params.search = search.trim();
       if (cat) params.category = cat;
-      if (zip && zip.trim()) params.zipCode = zip.trim();
+      if (pin && pin.trim()) {
+        params.pincode = pin.trim();
+        params.zipCode = pin.trim();
+      }
       if (Number(rating) > 0) params.minRating = Number(rating);
 
       const res = await getProviders(params);
@@ -58,9 +61,9 @@ const ProvidersPage = () => {
   const handleResetFilters = () => {
     setSearchTerm('');
     setSelectedCategory('');
-    setZipCode('');
+    setPincode('');
     setMinRating('0');
-    loadProviders({ search: '', category: '', zipCode: '', minRating: '0' });
+    loadProviders({ search: '', category: '', pincode: '', minRating: '0' });
   };
 
   return (
@@ -82,7 +85,7 @@ const ProvidersPage = () => {
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-slate-700 mb-1">Search Trade or Contractor</label>
             <Input
-              placeholder="e.g. Apex Electric, Plumbing, Vance..."
+              placeholder="e.g. Sharma Electricals, Plumbing, AC Servicing..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -105,11 +108,11 @@ const ProvidersPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Zip Code / Area</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Service Pincode</label>
             <Input
-              placeholder="e.g. 10001, 90026"
-              value={zipCode}
-              onChange={(e) => setZipCode(e.target.value)}
+              placeholder="e.g. 560001, 560034"
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value)}
             />
           </div>
 

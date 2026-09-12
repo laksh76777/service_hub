@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Input from '../common/Input';
-import { createBooking, getServices, getProviders } from '../../services/api';
+import { createBooking, getServices, getProviders, getMyAddresses, saveAddress } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const timeSlots = [
@@ -13,6 +13,24 @@ const timeSlots = [
   'Emergency Immediate Dispatch'
 ];
 
+const INDIAN_STATES = [
+  'Karnataka',
+  'Maharashtra',
+  'Delhi NCR',
+  'Tamil Nadu',
+  'Telangana',
+  'Gujarat',
+  'Uttar Pradesh',
+  'West Bengal',
+  'Kerala',
+  'Rajasthan',
+  'Punjab',
+  'Haryana',
+  'Madhya Pradesh'
+];
+
+const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+
 const BookingModal = ({
   isOpen,
   onClose,
@@ -20,10 +38,13 @@ const BookingModal = ({
   initialProvider = null
 }) => {
   const navigate = useNavigate();
-  const { user, mongoUser } = useAuth();
+  const { user } = useAuth();
 
   const [services, setServices] = useState([]);
   const [providers, setProviders] = useState([]);
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressMode, setSelectedAddressMode] = useState('new'); // 'saved' or 'new'
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState('');
   const [loadingOptions, setLoadingOptions] = useState(false);
 
   const [selectedServiceId, setSelectedServiceId] = useState(initialService?._id || '');
@@ -31,12 +52,16 @@ const BookingModal = ({
     initialProvider?._id || initialProvider?.userId?._id || ''
   );
 
-  // Address
-  const [streetAddress, setStreetAddress] = useState('');
-  const [unit, setUnit] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('CA');
-  const [zipCode, setZipCode] = useState('');
+  // Address fields
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [locality, setLocality] = useState('');
+  const [landmark, setLandmark] = useState('');
+  const [city, setCity] = useState('Bengaluru');
+  const [state, setState] = useState('Karnataka');
+  const [pincode, setPincode] = useState('');
+  const [saveToProfile, setSaveToProfile] = useState(false);
+  const [addressType, setAddressType] = useState('home');
 
   // Schedule
   const getTomorrowString = () => {
@@ -52,13 +77,6 @@ const BookingModal = ({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (initialService?._id) setSelectedServiceId(initialService._id);
-    if (initialProvider?._id || initialProvider?.userId?._id) {
-      setSelectedProviderId(initialProvider._id || initialProvider?.userId?._id);
-    }
-  }, [initialService, initialProvider]);
-
   const fetchOptions = async () => {
     setLoadingOptions(true);
     try {
@@ -68,6 +86,21 @@ const BookingModal = ({
       ]);
       setServices(srvRes.data.services || []);
       setProviders(provRes.data.providers || []);
+
+      if (user) {
+        try {
+          const addrRes = await getMyAddresses();
+          const addrs = addrRes.data.addresses || [];
+          setSavedAddresses(addrs);
+          if (addrs.length > 0) {
+            setSelectedAddressMode('saved');
+            setSelectedSavedAddressId(addrs[0]._id);
+            applySavedAddress(addrs[0]);
+          }
+        } catch {
+          // Non-critical if addresses fail
+        }
+      }
     } catch (err) {
       console.error('Failed to load services or providers list:', err);
     } finally {
@@ -75,11 +108,37 @@ const BookingModal = ({
     }
   };
 
+  const applySavedAddress = (addr) => {
+    if (!addr) return;
+    setAddressLine1(addr.addressLine1 || addr.streetAddress || '');
+    setAddressLine2(addr.addressLine2 || addr.unit || '');
+    setLocality(addr.locality || '');
+    setLandmark(addr.landmark || '');
+    setCity(addr.city || 'Bengaluru');
+    setState(addr.state || 'Karnataka');
+    setPincode(addr.pincode || addr.zipCode || '');
+  };
+
+  useEffect(() => {
+    if (initialService?._id) setSelectedServiceId(initialService._id);
+    if (initialProvider?._id || initialProvider?.userId?._id) {
+      setSelectedProviderId(initialProvider._id || initialProvider?.userId?._id);
+    }
+  }, [initialService, initialProvider]);
+
   useEffect(() => {
     if (isOpen) {
       fetchOptions();
     }
   }, [isOpen]);
+
+  const handleSavedAddressChange = (addrId) => {
+    setSelectedSavedAddressId(addrId);
+    const chosen = savedAddresses.find((a) => a._id === addrId);
+    if (chosen) {
+      applySavedAddress(chosen);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,17 +148,23 @@ const BookingModal = ({
     }
 
     if (!selectedServiceId || !selectedProviderId) {
-      setError('Please select both a service and a provider.');
+      setError('Please select both a service and a verified provider.');
       return;
     }
 
-    if (!streetAddress || !city || !zipCode) {
-      setError('Please fill in your complete address (street, city, zip code).');
+    const cleanPin = pincode.trim();
+    if (!addressLine1.trim() || !city.trim() || !cleanPin) {
+      setError('Please fill in Address Line 1, City, and 6-digit Pincode.');
+      return;
+    }
+
+    if (!PINCODE_REGEX.test(cleanPin)) {
+      setError('Please enter a valid 6-digit Indian PIN code (e.g. 560001, 560038).');
       return;
     }
 
     if (!problemDescription.trim()) {
-      setError('Please describe the problem or service requirements.');
+      setError('Please describe the problem or scope of work required.');
       return;
     }
 
@@ -107,16 +172,35 @@ const BookingModal = ({
     setError('');
 
     try {
+      const addressPayload = {
+        addressLine1: addressLine1.trim(),
+        streetAddress: addressLine1.trim(),
+        addressLine2: addressLine2.trim(),
+        unit: addressLine2.trim(),
+        locality: locality.trim(),
+        landmark: landmark.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        pincode: cleanPin,
+        zipCode: cleanPin
+      };
+
+      // If customer wants to save new address to their profile
+      if (selectedAddressMode === 'new' && saveToProfile) {
+        try {
+          await saveAddress({
+            type: addressType,
+            ...addressPayload
+          });
+        } catch (err) {
+          console.error('Non-critical: could not persist address to profile:', err);
+        }
+      }
+
       const payload = {
         serviceId: selectedServiceId,
         providerId: selectedProviderId,
-        address: {
-          streetAddress,
-          unit,
-          city,
-          state,
-          zipCode
-        },
+        address: addressPayload,
         scheduledDate,
         preferredTimeSlot: timeSlot,
         problemDescription
@@ -137,7 +221,7 @@ const BookingModal = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Request Service Appointment"
+      title="Request Local Service Appointment"
       footer={
         <div className="flex items-center justify-between w-full">
           <Button variant="outline" onClick={onClose} disabled={submitting}>
@@ -171,7 +255,7 @@ const BookingModal = ({
               <option value="">-- Choose Service --</option>
               {services.map((s) => (
                 <option key={s._id} value={s._id}>
-                  {s.name} (~${s.basePrice})
+                  {s.name} (~₹{s.basePrice || s.estimatedPriceRange?.min || 299})
                 </option>
               ))}
             </select>
@@ -190,7 +274,7 @@ const BookingModal = ({
               <option value="">-- Choose Provider --</option>
               {providers.map((p) => (
                 <option key={p._id} value={p.userId?._id || p._id}>
-                  {p.businessName || p.userId?.name || 'Verified Pro'} (⭐ {p.rating || '5.0'})
+                  {p.businessName || p.userId?.name || 'Verified Pro'} (⭐ {p.rating?.average?.toFixed(1) || '5.0'})
                 </option>
               ))}
             </select>
@@ -201,7 +285,7 @@ const BookingModal = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Preferred Date *
+              Preferred Date (IST) *
             </label>
             <input
               type="date"
@@ -231,58 +315,163 @@ const BookingModal = ({
           </div>
         </div>
 
-        {/* Address */}
-        <div className="pt-2 border-t border-slate-100 space-y-2">
-          <label className="block text-xs font-bold text-slate-800">
-            Service Location Address
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <Input
-                label="Street Address *"
-                placeholder="123 Market St"
-                value={streetAddress}
-                onChange={(e) => setStreetAddress(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <Input
-                label="Apt/Unit"
-                placeholder="Suite 4B"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-              />
-            </div>
+        {/* Saved Addresses / Address Selection */}
+        <div className="pt-2 border-t border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="block text-xs font-bold text-slate-800">
+              Service Address (India)
+            </label>
+            {savedAddresses.length > 0 && (
+              <div className="flex items-center gap-3 text-xs">
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="addressMode"
+                    checked={selectedAddressMode === 'saved'}
+                    onChange={() => {
+                      setSelectedAddressMode('saved');
+                      const found = savedAddresses.find((a) => a._id === selectedSavedAddressId) || savedAddresses[0];
+                      if (found) applySavedAddress(found);
+                    }}
+                  />
+                  <span>Saved Address</span>
+                </label>
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="addressMode"
+                    checked={selectedAddressMode === 'new'}
+                    onChange={() => {
+                      setSelectedAddressMode('new');
+                      setAddressLine1('');
+                      setAddressLine2('');
+                      setLocality('');
+                      setLandmark('');
+                      setPincode('');
+                    }}
+                  />
+                  <span>+ New Address</span>
+                </label>
+              </div>
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-2">
+
+          {selectedAddressMode === 'saved' && savedAddresses.length > 0 && (
             <div>
+              <select
+                value={selectedSavedAddressId}
+                onChange={(e) => handleSavedAddressChange(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-slate-50 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {savedAddresses.map((a) => (
+                  <option key={a._id} value={a._id}>
+                    [{a.type.toUpperCase()}] {a.addressLine1 || a.streetAddress}, {a.locality ? `${a.locality}, ` : ''}{a.city} - {a.pincode || a.zipCode}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Address Fields */}
+          <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="col-span-2">
+                <Input
+                  label="Flat, House No., Building, Street *"
+                  placeholder="e.g. 42, 2nd Floor, Lotus Residency"
+                  value={addressLine1}
+                  onChange={(e) => setAddressLine1(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Input
+                  label="Floor / Unit (Optional)"
+                  placeholder="e.g. Wing B"
+                  value={addressLine2}
+                  onChange={(e) => setAddressLine2(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
               <Input
-                label="City *"
-                placeholder="San Francisco"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-                required
+                label="Area / Locality / Sector"
+                placeholder="e.g. Indiranagar / Koramangala"
+                value={locality}
+                onChange={(e) => setLocality(e.target.value)}
+              />
+              <Input
+                label="Landmark (Optional)"
+                placeholder="e.g. Near Metro Station / BDA Complex"
+                value={landmark}
+                onChange={(e) => setLandmark(e.target.value)}
               />
             </div>
-            <div>
-              <Input
-                label="State *"
-                placeholder="CA"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-                required
-              />
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <Input
+                  label="City *"
+                  placeholder="e.g. Bengaluru"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">State *</label>
+                <select
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {INDIAN_STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <Input
+                  label="Pincode (6 digits) *"
+                  placeholder="e.g. 560001"
+                  value={pincode}
+                  maxLength={6}
+                  onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+                  required
+                />
+              </div>
             </div>
-            <div>
-              <Input
-                label="Zip Code *"
-                placeholder="94103"
-                value={zipCode}
-                onChange={(e) => setZipCode(e.target.value)}
-                required
-              />
-            </div>
+
+            {selectedAddressMode === 'new' && (
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={saveToProfile}
+                    onChange={(e) => setSaveToProfile(e.target.checked)}
+                    className="rounded border-slate-300 text-blue-600"
+                  />
+                  <span>Save this address to my account</span>
+                </label>
+                {saveToProfile && (
+                  <select
+                    value={addressType}
+                    onChange={(e) => setAddressType(e.target.value)}
+                    className="text-xs px-2 py-1 rounded border border-slate-300 bg-white"
+                  >
+                    <option value="home">Home</option>
+                    <option value="work">Work</option>
+                    <option value="job_site">Job Site</option>
+                    <option value="billing">Billing</option>
+                  </select>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -295,12 +484,12 @@ const BookingModal = ({
             rows={3}
             value={problemDescription}
             onChange={(e) => setProblemDescription(e.target.value)}
-            placeholder="Please detail symptoms, location of fixtures, urgency, or special instructions for the technician..."
+            placeholder="Please detail symptoms, appliance model, location of fixtures, urgency, or special instructions for the technician..."
             required
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="text-[11px] text-slate-400 mt-1">
-            Note: File attachment and image uploads will be enabled in an upcoming phase.
+            Pricing estimate is in Indian Rupees (₹). Payments will be collected in later phases.
           </p>
         </div>
       </form>

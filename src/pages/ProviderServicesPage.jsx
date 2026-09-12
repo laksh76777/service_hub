@@ -78,7 +78,7 @@ const ProviderServicesPage = () => {
     setCustomTitle('');
     setCustomDescription('');
     setPricingType('STARTING_AT');
-    setPriceAmount('100');
+    setPriceAmount('499');
     setModalError('');
     setAddModalOpen(true);
   };
@@ -89,7 +89,7 @@ const ProviderServicesPage = () => {
     if (chosen) {
       setCustomTitle(chosen.name);
       setCustomDescription(chosen.description || '');
-      setPriceAmount(String(chosen.estimatedPriceRange?.min || 100));
+      setPriceAmount(String(chosen.estimatedPriceRange?.min || 499));
     }
   };
 
@@ -110,7 +110,7 @@ const ProviderServicesPage = () => {
         pricing: {
           type: pricingType,
           amount: Number(priceAmount),
-          currency: 'USD'
+          currency: 'INR'
         }
       });
       setBanner({ type: 'success', text: 'Service offering added to your catalog!' });
@@ -146,7 +146,7 @@ const ProviderServicesPage = () => {
         pricing: {
           type: editPricingType,
           amount: Number(editAmount),
-          currency: 'USD'
+          currency: 'INR'
         },
         isActive: editActive
       });
@@ -279,7 +279,7 @@ const ProviderServicesPage = () => {
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
                   <span className="text-slate-500 font-medium">Custom Rate:</span>
                   <span className="font-bold text-slate-900 text-sm">
-                    ${offering.pricing?.amount} ({offering.pricing?.type?.replace('_', ' ')})
+                    ₹{offering.pricing?.amount} ({offering.pricing?.type?.replace('_', ' ')})
                   </span>
                 </div>
 
@@ -331,7 +331,7 @@ const ProviderServicesPage = () => {
 
           <Input
             label="Custom Offering Title"
-            placeholder="e.g. Master Emergency Leak Diagnosis & Repair"
+            placeholder="e.g. Split AC Jet Servicing & Cooling Inspection"
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
             required
@@ -367,7 +367,7 @@ const ProviderServicesPage = () => {
             </div>
 
             <Input
-              label="Price / Rate ($ USD)"
+              label="Price / Rate (₹ INR)"
               type="number"
               min="0"
               step="1"
@@ -435,7 +435,7 @@ const ProviderServicesPage = () => {
             </div>
 
             <Input
-              label="Price ($ USD)"
+              label="Price (₹ INR)"
               type="number"
               min="0"
               step="1"

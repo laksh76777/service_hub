@@ -79,5 +79,10 @@ export const getBookingById = (id) => api.get(`/bookings/${id}`);
 export const updateBookingStatus = (id, data) => api.patch(`/bookings/${id}/status`, data);
 export const rescheduleBooking = (id, data) => api.patch(`/bookings/${id}/reschedule`, data);
 
+// Saved Addresses APIs
+export const getMyAddresses = () => api.get('/addresses');
+export const saveAddress = (data) => api.post('/addresses', data);
+export const deleteAddress = (id) => api.delete(`/addresses/${id}`);
+
 export default api;
 

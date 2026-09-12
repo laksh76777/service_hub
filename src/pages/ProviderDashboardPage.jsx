@@ -262,7 +262,7 @@ const ProviderDashboardPage = () => {
             {profile?.serviceArea?.cities?.length || 0} Cities
           </div>
           <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {profile?.serviceArea?.zipCodes?.length || 0} Zip Codes
+            {profile?.serviceArea?.pincodes?.length || profile?.serviceArea?.zipCodes?.length || 0} PIN Codes
           </span>
         </div>
       </div>
@@ -292,7 +292,7 @@ const ProviderDashboardPage = () => {
               <Card
                 key={b._id}
                 title={<span>{b.serviceId?.name || 'Service Job'}</span>}
-                subtitle={`Ref: ${b.bookingNumber} • Scheduled: ${new Date(b.scheduledDate).toLocaleDateString()} (${b.preferredTimeSlot})`}
+                subtitle={`Ref: ${b.bookingNumber} • Scheduled: ${new Date(b.scheduledDate).toLocaleDateString('en-IN')} (${b.preferredTimeSlot})`}
                 footer={
                   <div className="flex items-center justify-between w-full pt-1">
                     <Link to={`/bookings/${b._id}`}>
@@ -331,7 +331,11 @@ const ProviderDashboardPage = () => {
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block">Job Location:</span>
-                    <span className="text-slate-700">{b.address?.streetAddress}, {b.address?.city} {b.address?.zipCode}</span>
+                    <span className="text-slate-700">
+                      {b.address?.addressLine1 || b.address?.streetAddress}
+                      {b.address?.locality ? `, ${b.address.locality}` : ''}
+                      {b.address?.city ? `, ${b.address.city}` : ''} - {b.address?.pincode || b.address?.zipCode}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block">Problem Scope:</span>
@@ -368,10 +372,10 @@ const ProviderDashboardPage = () => {
               <Card
                 key={b._id}
                 title={<span>{b.serviceId?.name}</span>}
-                subtitle={`Ref: ${b.bookingNumber} • ${new Date(b.scheduledDate).toLocaleDateString()}`}
+                subtitle={`Ref: ${b.bookingNumber} • ${new Date(b.scheduledDate).toLocaleDateString('en-IN')}`}
                 footer={
                   <div className="flex items-center justify-between w-full pt-1">
-                    <span className="text-[11px] font-bold text-slate-500">${b.pricing?.estimatedTotal || 0}</span>
+                    <span className="text-[11px] font-bold text-slate-700">₹{b.pricing?.estimatedTotal || 0}</span>
                     <Link to={`/bookings/${b._id}`}>
                       <Button size="sm" variant="primary">
                         Manage Job &rarr;
@@ -393,7 +397,10 @@ const ProviderDashboardPage = () => {
                   </div>
                   <div>
                     <span className="text-slate-400 font-semibold block">Address:</span>
-                    <span className="text-slate-600">{b.address?.streetAddress}, {b.address?.city}</span>
+                    <span className="text-slate-600">
+                      {b.address?.addressLine1 || b.address?.streetAddress}
+                      {b.address?.locality ? `, ${b.address.locality}` : ''}, {b.address?.city}
+                    </span>
                   </div>
                 </div>
               </Card>

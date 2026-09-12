@@ -82,8 +82,8 @@ const ServiceDetailPage = () => {
             <div>
               <span className="text-xs uppercase tracking-wider text-slate-300 font-medium block">Standard Estimate</span>
               <div className="text-2xl font-black text-white mt-1">
-                ${service.estimatedPriceRange?.min} - ${service.estimatedPriceRange?.max}{' '}
-                <span className="text-xs font-normal text-slate-300">{service.estimatedPriceRange?.currency}</span>
+                ₹{service.estimatedPriceRange?.min} - ₹{service.estimatedPriceRange?.max}{' '}
+                <span className="text-xs font-normal text-slate-300">{service.estimatedPriceRange?.currency || 'INR'}</span>
               </div>
               <p className="text-[11px] text-slate-400 mt-1">Estimates include standard 30-day workmanship warranty.</p>
             </div>
@@ -181,8 +181,8 @@ const ServiceDetailPage = () => {
                       <div className="flex justify-between items-center">
                         <span className="font-bold text-slate-900">{p.offering.customTitle || service.name}</span>
                         <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-black uppercase tracking-wide">
-                          {p.offering.pricing?.type?.replace('_', ' ')}: ${p.offering.pricing?.amount}{' '}
-                          {p.offering.pricing?.currency}
+                          {p.offering.pricing?.type?.replace('_', ' ')}: ₹{p.offering.pricing?.amount}{' '}
+                          {p.offering.pricing?.currency || 'INR'}
                         </span>
                       </div>
                       {p.offering.description && (

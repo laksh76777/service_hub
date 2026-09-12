@@ -31,6 +31,9 @@ const ALLOWED_URGENCIES = ['LOW', 'MEDIUM', 'HIGH'];
 const ADVISORY_DISCLAIMER =
   'AI recommendation only. Does not constitute a technical diagnosis, approval, or pricing commitment. Customer and service provider retain full responsibility.';
 
+const getGeminiApiKey = () => (process.env.GEMINI_API_KEY || '').trim();
+const getGeminiModel = () => (process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim();
+
 /**
  * Validate and sanitize structured AI classification output
  * @param {Object} output
@@ -350,19 +353,25 @@ const classifyServiceRequest = async (description, options = {}) => {
   // 3. Execution: If mock or external provider is passed, handle defensively
   let rawResult;
   try {
+    let usedEngine = 'pattern_engine';
     if (typeof options.customProvider === 'function') {
       // Allows testing external AI providers, network timeouts, and malformed responses
       rawResult = await options.customProvider(cleanDescription);
-    } else if (process.env.GEMINI_API_KEY && !options.forcePatternEngine) {
+      usedEngine = 'custom_provider';
+    } else if (getGeminiApiKey() && !options.forcePatternEngine) {
       // Optional external Google Gemini integration if key is present
       rawResult = await callGeminiModel(cleanDescription);
+      usedEngine = 'gemini';
     } else {
       // Standard resilient classification pattern engine
       rawResult = classifyWithPatternEngine(cleanDescription);
     }
 
     // 4. Validate output on backend
-    return validateAiClassification(rawResult);
+    const validated = validateAiClassification(rawResult);
+    validated.fallbackUsed = false;
+    validated.engine = usedEngine;
+    return validated;
   } catch (error) {
     if (logger.warn) {
       logger.warn('AI classification failed, falling back to resilient pattern engine:', error.message);
@@ -397,7 +406,8 @@ const classifyServiceRequest = async (description, options = {}) => {
  * Encapsulated purely inside aiService.js
  */
 const callGeminiModel = async (description) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getGeminiApiKey();
+  const model = getGeminiModel();
   const prompt = `You are an advisory assistant for an Indian home services platform called ServiceHub.
 Analyze the customer's problem description and convert it into a structured service recommendation.
 
@@ -414,7 +424,7 @@ You must respond ONLY with a single valid JSON object strictly matching this sch
 
 Do NOT output markdown code blocks. Do not add conversational text.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -527,15 +537,23 @@ const assistEstimate = async (inspectionNotes, serviceName = '', options = {}) =
   }
 
   try {
-    if (process.env.GEMINI_API_KEY && !options.forcePatternEngine) {
+    if (getGeminiApiKey() && !options.forcePatternEngine) {
       const result = await callGeminiEstimateAssist(inspectionNotes.trim(), serviceName);
+      result.fallbackUsed = false;
+      result.engine = 'gemini';
       return result;
     }
-    return assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+    const result = assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+    result.fallbackUsed = false;
+    result.engine = 'pattern_engine';
+    return result;
   } catch (err) {
     console.warn('[AIService] Estimate assist failed, falling back to pattern engine:', err.message);
     try {
-      return assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+      const fallback = assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+      fallback.fallbackUsed = true;
+      fallback.engine = 'pattern_engine';
+      return fallback;
     } catch (fallbackErr) {
       return {
         inspectionSummary: inspectionNotes.trim().slice(0, 100),
@@ -555,7 +573,8 @@ const assistEstimate = async (inspectionNotes, serviceName = '', options = {}) =
  * Gemini-powered estimate assist (optional)
  */
 const callGeminiEstimateAssist = async (inspectionNotes, serviceName) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getGeminiApiKey();
+  const model = getGeminiModel();
   const prompt = `You are an assistant for a home services platform in India called ServiceHub.
 A technician completed on-site inspection and wrote these notes: "${inspectionNotes}"
 Service type: ${serviceName || 'General home service'}
@@ -572,7 +591,7 @@ Respond ONLY with a single valid JSON object matching this schema:
 }
 Maximum 5 suggested items. Do NOT include prices. Do NOT output markdown.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -688,15 +707,23 @@ function generateAdminSummaryWithPatternEngine(data, summaryType) {
  */
 const generateAdminSummary = async (data, summaryType = 'general', options = {}) => {
   try {
-    if (process.env.GEMINI_API_KEY && !options.forcePatternEngine) {
+    if (getGeminiApiKey() && !options.forcePatternEngine) {
       const result = await callGeminiAdminSummary(data, summaryType);
+      result.fallbackUsed = false;
+      result.engine = 'gemini';
       return result;
     }
-    return generateAdminSummaryWithPatternEngine(data, summaryType);
+    const result = generateAdminSummaryWithPatternEngine(data, summaryType);
+    result.fallbackUsed = false;
+    result.engine = 'pattern_engine';
+    return result;
   } catch (err) {
     console.warn('[AIService] Admin summary failed, falling back to pattern engine:', err.message);
     try {
-      return generateAdminSummaryWithPatternEngine(data, summaryType);
+      const fallback = generateAdminSummaryWithPatternEngine(data, summaryType);
+      fallback.fallbackUsed = true;
+      fallback.engine = 'pattern_engine';
+      return fallback;
     } catch (fallbackErr) {
       return {
         summaryType,
@@ -715,7 +742,8 @@ const generateAdminSummary = async (data, summaryType = 'general', options = {})
  * Gemini-powered admin summary (optional)
  */
 const callGeminiAdminSummary = async (data, summaryType) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getGeminiApiKey();
+  const model = getGeminiModel();
   const { overview = {} } = data;
   const contextStr = JSON.stringify({
     totalCustomers: overview.totalCustomers || 0,
@@ -747,7 +775,7 @@ Rules:
 }
 Do NOT output markdown.`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

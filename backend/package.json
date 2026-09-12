@@ -23,6 +23,7 @@
     "test:post-payment-lifecycle": "node scripts/test-post-payment-lifecycle.js",
     "test:phase9": "node scripts/test-phase9-warranty-disputes-reviews-notifications.js",
     "test:phase11": "node scripts/test-phase11-ai-classification.js",
+    "test:gemini": "node scripts/test-gemini-live.js",
     "test:production": "node scripts/test-production-readiness.js"
   },
   "dependencies": {

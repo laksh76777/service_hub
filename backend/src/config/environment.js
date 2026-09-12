@@ -17,7 +17,9 @@ const config = {
     password: process.env.REDIS_PASSWORD || undefined,
     url: process.env.REDIS_URL || undefined,
     enableOfflineQueue: false
-  }
+  },
+  geminiApiKey: process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null,
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 };
 
 module.exports = config;

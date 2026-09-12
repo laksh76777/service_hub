@@ -46,4 +46,30 @@ export const getMe = () => api.get('/users/me');
 export const updateMe = (data) => api.patch('/users/me', data);
 export const syncUserProfile = (data) => api.post('/users/sync', data);
 
+// Service Categories
+export const getCategories = () => api.get('/categories');
+export const getCategoryById = (id) => api.get(`/categories/${id}`);
+
+// Services Marketplace
+export const getServices = (params = {}) => api.get('/services', { params });
+export const getServiceById = (id) => api.get(`/services/${id}`);
+
+// Public Verified Providers Directory
+export const getProviders = (params = {}) => api.get('/providers', { params });
+export const getProviderById = (id) => api.get(`/providers/${id}`);
+
+// Provider Portal Management
+export const getMyProviderProfile = () => api.get('/provider/profile');
+export const updateMyProviderProfile = (data) => api.patch('/provider/profile', data);
+export const getMyServices = () => api.get('/provider/services');
+export const addServiceOffering = (data) => api.post('/provider/services', data);
+export const updateServiceOffering = (serviceId, data) => api.patch(`/provider/services/${serviceId}`, data);
+export const removeServiceOffering = (serviceId) => api.delete(`/provider/services/${serviceId}`);
+
+// Admin Moderation
+export const adminGetProviders = (params = {}) => api.get('/admin/providers', { params });
+export const adminUpdateProviderStatus = (id, data) => api.patch(`/admin/providers/${id}/status`, data);
+export const adminCreateCategory = (data) => api.post('/categories', data);
+export const adminCreateService = (data) => api.post('/services', data);
+
 export default api;

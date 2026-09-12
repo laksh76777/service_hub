@@ -8,10 +8,13 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { user, mongoUser, isAuthenticated, logout } = useAuth();
 
+  const isProviderOrAdmin = mongoUser?.role === 'PROVIDER' || mongoUser?.role === 'ADMIN';
+
   const navLinks = [
     { name: 'Services', path: '/services' },
     { name: 'Providers', path: '/providers' },
-    ...(isAuthenticated ? [{ name: 'Dashboard', path: '/dashboard' }] : [])
+    ...(isAuthenticated ? [{ name: 'Dashboard', path: '/dashboard' }] : []),
+    ...(isProviderOrAdmin ? [{ name: 'Provider Portal', path: '/provider/dashboard' }] : [])
   ];
 
   const isActive = (path) => location.pathname === path;

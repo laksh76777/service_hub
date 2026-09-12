@@ -31,6 +31,11 @@ const ProviderDashboardPage = () => {
   const [actionFeedback, setActionFeedback] = useState('');
 
   const loadProviderData = async () => {
+    // ADMIN users do not have a ProviderProfile — skip the profile API call
+    if (isAdmin) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await getMyProviderProfile();
@@ -73,12 +78,14 @@ const ProviderDashboardPage = () => {
   };
 
   useEffect(() => {
-    loadProviderData();
-    loadBookings();
-    if (isAdmin) {
-      loadAdminProviders('PENDING');
+    if (mongoUser) {
+      loadProviderData();
+      loadBookings();
+      if (isAdmin) {
+        loadAdminProviders('PENDING');
+      }
     }
-  }, [isAdmin]);
+  }, [isAdmin, mongoUser]);
 
   const handleQuickStatusTransition = async (bookingId, targetStatus, reason = '') => {
     try {
@@ -164,29 +171,39 @@ const ProviderDashboardPage = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-            Provider Portal
+          <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
+            isAdmin
+              ? 'text-purple-600 bg-purple-50 border-purple-100'
+              : 'text-blue-600 bg-blue-50 border-blue-100'
+          }`}>
+            {isAdmin ? '👑 Admin Control Panel' : 'Provider Portal'}
           </span>
           <h1 className="text-3xl font-black text-slate-900 mt-2">
-            {profile?.businessName || `${user?.displayName}'s Business`}
+            {isAdmin
+              ? `Welcome, ${mongoUser?.name || user?.displayName || 'Admin'}`
+              : (profile?.businessName || `${user?.displayName}'s Business`)}
           </h1>
           <p className="text-slate-500 text-xs mt-1">
-            Manage your credentials, coverage areas, service offerings, and incoming customer booking requests.
+            {isAdmin
+              ? 'Manage provider verifications, monitor bookings, handle disputes, and oversee the platform.'
+              : 'Manage your credentials, coverage areas, service offerings, and incoming customer booking requests.'}
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <Link to="/provider/profile">
-            <Button variant="outline" size="sm">
-              Edit Profile
-            </Button>
-          </Link>
-          <Link to="/provider/services">
-            <Button variant="primary" size="sm">
-              Manage Services ({profile?.servicesOffered?.length || 0})
-            </Button>
-          </Link>
-        </div>
+        {!isAdmin && (
+          <div className="flex gap-3">
+            <Link to="/provider/profile">
+              <Button variant="outline" size="sm">
+                Edit Profile
+              </Button>
+            </Link>
+            <Link to="/provider/services">
+              <Button variant="primary" size="sm">
+                Manage Services ({profile?.servicesOffered?.length || 0})
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
 
       {bookingNotice && (
@@ -196,41 +213,43 @@ const ProviderDashboardPage = () => {
         </div>
       )}
 
-      {/* Verification Status Banner */}
-      <div className={`p-6 rounded-2xl border ${statusBannerConfig.bg} shadow-sm`}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <span className="text-2xl flex-shrink-0">{statusBannerConfig.icon}</span>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-bold text-base">{statusBannerConfig.title}</h2>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusBannerConfig.badge}`}>
-                  {status}
-                </span>
+      {/* Verification Status Banner — only shown to PROVIDER users */}
+      {!isAdmin && (
+        <div className={`p-6 rounded-2xl border ${statusBannerConfig.bg} shadow-sm`}>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <span className="text-2xl flex-shrink-0">{statusBannerConfig.icon}</span>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-bold text-base">{statusBannerConfig.title}</h2>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusBannerConfig.badge}`}>
+                    {status}
+                  </span>
+                </div>
+                <p className="text-xs mt-1 opacity-90 leading-relaxed max-w-3xl">
+                  {statusBannerConfig.message}
+                </p>
               </div>
-              <p className="text-xs mt-1 opacity-90 leading-relaxed max-w-3xl">
-                {statusBannerConfig.message}
-              </p>
+            </div>
+
+            <div className="flex-shrink-0">
+              {status === 'VERIFIED' ? (
+                <Link to={`/providers/${profile?._id}`}>
+                  <Button size="sm" variant="outline" className="bg-white/80">
+                    View Public Profile
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/provider/profile">
+                  <Button size="sm" variant="primary">
+                    Update Credentials
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
-
-          <div className="flex-shrink-0">
-            {status === 'VERIFIED' ? (
-              <Link to={`/providers/${profile?._id}`}>
-                <Button size="sm" variant="outline" className="bg-white/80">
-                  View Public Profile
-                </Button>
-              </Link>
-            ) : (
-              <Link to="/provider/profile">
-                <Button size="sm" variant="primary">
-                  Update Credentials
-                </Button>
-              </Link>
-            )}
-          </div>
         </div>
-      </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

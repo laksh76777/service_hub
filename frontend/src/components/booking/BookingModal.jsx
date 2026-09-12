@@ -71,7 +71,7 @@ const BookingModal = ({
   };
 
   const [scheduledDate, setScheduledDate] = useState(getTomorrowString());
-  const [timeSlot, setTimeSlot] = useState('Morning (09:00 - 12:00)');
+  const [timeSlot, setTimeSlot] = useState(''); // optional — empty means any available
   const [problemDescription, setProblemDescription] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
@@ -314,11 +314,17 @@ const BookingModal = ({
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Choose Provider --</option>
-              {providers.map((p) => (
-                <option key={p._id} value={p.userId?._id || p._id}>
-                  {p.businessName || p.userId?.name || 'Verified Pro'} (⭐ {p.rating?.average?.toFixed(1) || '5.0'})
-                </option>
-              ))}
+              {providers.map((p, idx) => {
+                // Backend expects the User's _id (looked up via User.findById)
+                // p.userId is the populated User object; p.userId?._id is the User ObjectId
+                const userObjId = p.userId?._id?.toString() || p.userId?.toString();
+                const displayId = userObjId || p._id?.toString() || '';
+                return (
+                  <option key={p._id || `prov-${idx}`} value={displayId}>
+                    {p.businessName || p.userId?.name || 'Verified Pro'} (⭐ {p.rating?.average?.toFixed(1) || '5.0'})
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
@@ -341,13 +347,14 @@ const BookingModal = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Preferred Time Window *
+              Preferred Time Window <span className="text-slate-400 font-normal">(optional)</span>
             </label>
             <select
               value={timeSlot}
               onChange={(e) => setTimeSlot(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
+              <option value="">-- Any available time --</option>
               {timeSlots.map((ts) => (
                 <option key={ts} value={ts}>
                   {ts}

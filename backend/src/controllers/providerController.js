@@ -174,6 +174,14 @@ const getPublicProviderById = async (req, res) => {
  */
 const getMyProviderProfile = async (req, res) => {
   try {
+    // ADMIN users do not have a ProviderProfile
+    if (req.user.role === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts do not have a provider profile. Use admin endpoints for platform management.'
+      });
+    }
+
     let profile = await ProviderProfile.findOne({ userId: req.user._id })
       .populate('categories', 'name slug icon')
       .populate('servicesOffered.serviceId', 'name slug categoryId estimatedPriceRange');

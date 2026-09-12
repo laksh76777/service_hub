@@ -18,9 +18,14 @@ const RegisterPage = () => {
   const { register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
+  const getRoleDashboard = (role) => {
+    if (role === 'PROVIDER' || role === 'provider') return '/provider/dashboard';
+    return '/dashboard';
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate(getRoleDashboard(role), { replace: true });
     }
   }, [isAuthenticated, navigate]);
 
@@ -42,7 +47,7 @@ const RegisterPage = () => {
         phone,
         businessName: role === 'provider' ? businessName : undefined
       });
-      navigate('/dashboard', {
+      navigate(getRoleDashboard(role), {
         replace: true,
         state: { registered: true }
       });

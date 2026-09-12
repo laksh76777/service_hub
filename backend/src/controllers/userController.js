@@ -140,7 +140,7 @@ const syncProfile = async (req, res) => {
           await ProviderProfile.create({
             userId: user._id,
             businessName: businessName?.trim() || `${user.name}'s Services`,
-            status: PROVIDER_STATUS.PENDING_APPROVAL
+            status: PROVIDER_STATUS.PENDING
           });
         }
       } else if (normalizedRole === USER_ROLES.CUSTOMER) {

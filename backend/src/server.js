@@ -1,6 +1,7 @@
 const app = require('./app');
 const config = require('./config/environment');
 const { connectDB, disconnectDB } = require('./config/database');
+const { seedMarketplaceData } = require('./utils/seedData');
 
 const PORT = config.port;
 
@@ -9,6 +10,7 @@ let server;
 const startServer = async () => {
   try {
     await connectDB();
+    await seedMarketplaceData();
 
     server = app.listen(PORT, () => {
       console.log(`ServiceHub server running on port ${PORT}`);

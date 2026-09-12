@@ -12,10 +12,17 @@ const USER_STATUS = Object.freeze({
 });
 
 const PROVIDER_STATUS = Object.freeze({
-  PENDING_APPROVAL: 'pending_approval',
-  VERIFIED: 'verified',
-  REJECTED: 'rejected',
-  SUSPENDED: 'suspended'
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  REJECTED: 'REJECTED',
+  SUSPENDED: 'SUSPENDED'
+});
+
+const SERVICE_PRICING_TYPE = Object.freeze({
+  FIXED: 'FIXED',
+  HOURLY: 'HOURLY',
+  STARTING_AT: 'STARTING_AT',
+  CUSTOM_ESTIMATE: 'CUSTOM_ESTIMATE'
 });
 
 const SERVICE_CATEGORY_STATUS = Object.freeze({
@@ -171,6 +178,7 @@ module.exports = {
   USER_ROLES,
   USER_STATUS,
   PROVIDER_STATUS,
+  SERVICE_PRICING_TYPE,
   SERVICE_CATEGORY_STATUS,
   SERVICE_STATUS,
   SERVICE_REQUEST_STATUS,

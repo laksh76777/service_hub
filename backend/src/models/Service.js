@@ -44,5 +44,7 @@ const serviceSchema = new mongoose.Schema(
 );
 
 serviceSchema.index({ categoryId: 1, slug: 1 }, { unique: true });
+serviceSchema.index({ categoryId: 1, status: 1 });
+serviceSchema.index({ name: 'text', description: 'text' });
 
 module.exports = mongoose.model('Service', serviceSchema);

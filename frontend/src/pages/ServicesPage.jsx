@@ -1,163 +1,195 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
-import Modal from '../components/common/Modal';
 import Input from '../components/common/Input';
 import EmptyState from '../components/common/EmptyState';
-
-const initialServices = [
-  { id: '1', name: 'Plumbing Repair & Installation', category: 'Plumbing', avgEstimate: '$80 - $250', providersCount: 14, icon: '🔧' },
-  { id: '2', name: 'Electrical Panel & Rewiring', category: 'Electrical', avgEstimate: '$120 - $400', providersCount: 9, icon: '⚡' },
-  { id: '3', name: 'HVAC Seasonal Servicing & Repair', category: 'HVAC', avgEstimate: '$90 - $350', providersCount: 12, icon: '❄️' },
-  { id: '4', name: 'Roof Inspection & Leak Repair', category: 'Roofing', avgEstimate: '$150 - $600', providersCount: 6, icon: '🏠' },
-  { id: '5', name: 'Interior & Exterior Painting', category: 'Painting', avgEstimate: '$200 - $1200', providersCount: 18, icon: '🎨' },
-  { id: '6', name: 'Carpentry & Cabinetry', category: 'Carpentry', avgEstimate: '$100 - $500', providersCount: 8, icon: '🪚' }
-];
+import Loading from '../components/common/Loading';
+import { getCategories, getServices } from '../services/api';
 
 const ServicesPage = () => {
-  const [services, setServices] = useState(initialServices);
+  const [categories, setCategories] = useState([]);
+  const [services, setServices] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [bookingModalOpen, setBookingModalOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState(null);
-  const [requestNotes, setRequestNotes] = useState('');
-  const [submittedMessage, setSubmittedMessage] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const categories = ['All', 'Plumbing', 'Electrical', 'HVAC', 'Roofing', 'Painting', 'Carpentry'];
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [catRes, srvRes] = await Promise.all([
+        getCategories().catch(() => ({ data: { categories: [] } })),
+        getServices().catch(() => ({ data: { services: [] } }))
+      ]);
 
-  const filteredServices = selectedCategory === 'All'
-    ? services
-    : services.filter(s => s.category === selectedCategory);
-
-  const handleOpenBooking = (service) => {
-    setSelectedService(service);
-    setRequestNotes('');
-    setSubmittedMessage('');
-    setBookingModalOpen(true);
+      if (catRes?.data?.categories) {
+        setCategories(catRes.data.categories);
+      }
+      if (srvRes?.data?.services) {
+        setServices(srvRes.data.services);
+      }
+    } catch (err) {
+      console.error('Failed to load marketplace services:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleConfirmRequest = (e) => {
-    e.preventDefault();
-    setSubmittedMessage(`Request registered for "${selectedService.name}". In Phase 2 this will persist to MongoDB.`);
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleSearch = async (term, categorySlug) => {
+    setSearchTerm(term);
+    setLoading(true);
+    try {
+      const params = {};
+      if (term && term.trim()) params.search = term.trim();
+      if (categorySlug && categorySlug !== 'All') params.category = categorySlug;
+
+      const res = await getServices(params);
+      if (res?.data?.services) {
+        setServices(res.data.services);
+      }
+    } catch (err) {
+      console.error('Failed to filter services:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategorySelect = (catSlug) => {
+    setSelectedCategory(catSlug);
+    handleSearch(searchTerm, catSlug);
   };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900">Explore Services</h1>
-        <p className="text-slate-600 mt-1 text-sm">
-          Browse verified local home and commercial services with transparent estimate ranges.
-        </p>
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+            Marketplace Catalog
+          </span>
+          <h1 className="text-3xl font-extrabold text-slate-900 mt-2">Explore Professional Services</h1>
+          <p className="text-slate-600 mt-1 text-sm max-w-2xl">
+            Browse certified trade services with upfront price estimates, verified local contractors, and guaranteed satisfaction.
+          </p>
+        </div>
+        <div className="w-full md:w-80">
+          <Input
+            placeholder="Search services, e.g. panel upgrade, leak..."
+            value={searchTerm}
+            onChange={(e) => handleSearch(e.target.value, selectedCategory)}
+          />
+        </div>
       </div>
 
       {/* Category Filter Pills */}
-      <div className="flex flex-wrap gap-2 mb-8">
+      <div className="flex flex-wrap gap-2 mb-8 items-center">
+        <button
+          onClick={() => handleCategorySelect('All')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+            selectedCategory === 'All'
+              ? 'bg-blue-600 text-white shadow-blue-200'
+              : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+          }`}
+        >
+          All Categories ({services.length})
+        </button>
+
         {categories.map((cat) => (
           <button
-            key={cat}
-            onClick={() => setSelectedCategory(cat)}
-            className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              selectedCategory === cat
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+            key={cat._id}
+            onClick={() => handleCategorySelect(cat.slug)}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all border ${
+              selectedCategory === cat.slug
+                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            {cat}
+            <span>{cat.icon || '🛠️'}</span>
+            <span>{cat.name}</span>
+            {cat.servicesCount > 0 && (
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  selectedCategory === cat.slug ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {cat.servicesCount}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {/* Service Cards Grid */}
-      {filteredServices.length === 0 ? (
+      {/* Loading state */}
+      {loading ? (
+        <Loading fullPage text="Finding matching services..." />
+      ) : services.length === 0 ? (
         <EmptyState
-          title="No services in this category"
-          description="Try selecting another category or check back soon."
-          actionLabel="Reset Category Filter"
-          onAction={() => setSelectedCategory('All')}
+          title="No matching services found"
+          description="Try broadening your search term or selecting a different category."
+          actionLabel="View All Services"
+          onAction={() => {
+            setSearchTerm('');
+            handleCategorySelect('All');
+          }}
         />
       ) : (
+        /* Services Grid */
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredServices.map((service) => (
+          {services.map((service) => (
             <Card
-              key={service.id}
+              key={service._id}
               title={
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{service.icon}</span>
-                  <span className="text-base font-semibold">{service.name}</span>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
+                    {service.name}
+                  </span>
+                  <span className="text-xl p-1 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0">
+                    {service.categoryId?.icon || '🛠️'}
+                  </span>
                 </div>
               }
-              subtitle={`Category: ${service.category}`}
+              subtitle={
+                <span className="inline-flex items-center text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md mt-1">
+                  {service.categoryId?.name || 'General Service'}
+                </span>
+              }
               footer={
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 font-medium">
-                    {service.providersCount} Providers Active
-                  </span>
-                  <Button size="sm" variant="primary" onClick={() => handleOpenBooking(service)}>
-                    Request Service
-                  </Button>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-xs font-medium text-slate-600">
+                      {service.providersCount} Verified Pro{service.providersCount === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  <Link to={`/services/${service._id}`}>
+                    <Button size="sm" variant="primary">
+                      View Pros
+                    </Button>
+                  </Link>
                 </div>
               }
             >
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Estimate Range:</span>
-                  <span className="font-semibold text-slate-800">{service.avgEstimate}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500">Warranty:</span>
-                  <span className="text-emerald-600 font-medium">Included (30-90 days)</span>
+              <div className="space-y-3">
+                <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                  {service.description || 'Professional service by certified local contractors.'}
+                </p>
+
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                  <span className="text-slate-500 font-medium">Estimate Range:</span>
+                  <span className="font-bold text-slate-900">
+                    ${service.estimatedPriceRange?.min || 50} - ${service.estimatedPriceRange?.max || 200}{' '}
+                    {service.estimatedPriceRange?.currency || 'USD'}
+                  </span>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       )}
-
-      {/* Booking Request Modal Placeholder */}
-      <Modal
-        isOpen={bookingModalOpen}
-        onClose={() => setBookingModalOpen(false)}
-        title={selectedService ? `Request ${selectedService.name}` : 'Request Service'}
-        footer={
-          submittedMessage ? (
-            <Button variant="secondary" onClick={() => setBookingModalOpen(false)}>Close</Button>
-          ) : (
-            <>
-              <Button variant="outline" onClick={() => setBookingModalOpen(false)}>Cancel</Button>
-              <Button variant="primary" onClick={handleConfirmRequest}>Submit Request</Button>
-            </>
-          )
-        }
-      >
-        {submittedMessage ? (
-          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-sm">
-            {submittedMessage}
-          </div>
-        ) : (
-          <form onSubmit={handleConfirmRequest} className="space-y-4">
-            <p className="text-xs text-slate-500">
-              Fill in your requirement. A certified provider will review and prepare an estimate.
-            </p>
-            <Input
-              label="Location / Zip Code"
-              placeholder="e.g. 10001 or Downtown"
-              required
-            />
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Describe the problem or project
-              </label>
-              <textarea
-                rows={3}
-                value={requestNotes}
-                onChange={(e) => setRequestNotes(e.target.value)}
-                placeholder="Explain what needs fixing, any existing damage, or special instructions..."
-                className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
-                required
-              />
-            </div>
-          </form>
-        )}
-      </Modal>
     </div>
   );
 };

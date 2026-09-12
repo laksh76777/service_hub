@@ -5,16 +5,18 @@ import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import EmptyState from '../components/common/EmptyState';
 import Modal from '../components/common/Modal';
+import BookingModal from '../components/booking/BookingModal';
 import { useAuth } from '../context/AuthContext';
 import { updateMe, getBookings } from '../services/api';
 
 const DashboardPage = () => {
   const { user, mongoUser, isEmailVerified, resendVerificationEmail, refreshUserProfile } = useAuth();
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('bookings');
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [inspectBooking, setInspectBooking] = useState(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const loadCustomerBookings = async () => {
     setBookingsLoading(true);
@@ -123,8 +125,8 @@ const DashboardPage = () => {
         </div>
       )}
 
-      {/* User Header */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* User Header & Metrics */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-slate-900">
@@ -138,11 +140,42 @@ const DashboardPage = () => {
             Authenticated via Firebase Auth | UID: <span className="font-mono text-slate-700">{user?.uid}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-500">Account Status:</span>
-          <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold uppercase">
-            {mongoUser?.status || 'ACTIVE'}
-          </span>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => setShowBookingModal(true)}
+            className="shadow-sm shadow-blue-500/20"
+          >
+            + Request New Service
+          </Button>
+        </div>
+      </div>
+
+      {/* Metric Cards Row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+          <span className="text-xs text-slate-500 font-semibold uppercase">Total Requests</span>
+          <div className="text-2xl font-black text-slate-900 mt-1">{bookings.length}</div>
+        </div>
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+          <span className="text-xs text-blue-600 font-semibold uppercase">Active / Scheduled</span>
+          <div className="text-2xl font-black text-blue-600 mt-1">
+            {bookings.filter((b) => !['COMPLETED', 'CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_PROVIDER'].includes(b.status)).length}
+          </div>
+        </div>
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+          <span className="text-xs text-amber-600 font-semibold uppercase">In Progress</span>
+          <div className="text-2xl font-black text-amber-600 mt-1">
+            {bookings.filter((b) => ['IN_PROGRESS', 'TECHNICIAN_ARRIVED', 'COMPLETION_PENDING'].includes(b.status)).length}
+          </div>
+        </div>
+        <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-xs">
+          <span className="text-xs text-emerald-600 font-semibold uppercase">Verified Completed</span>
+          <div className="text-2xl font-black text-emerald-600 mt-1">
+            {bookings.filter((b) => b.status === 'COMPLETED').length}
+          </div>
         </div>
       </div>
 
@@ -150,15 +183,15 @@ const DashboardPage = () => {
       <div className="border-b border-slate-200 mb-6">
         <nav className="flex space-x-6">
           {[
-            { id: 'overview', label: 'My Profile & Role' },
-            { id: 'bookings', label: 'Service Bookings' },
-            { id: 'estimates', label: 'Estimates' },
-            { id: 'verification', label: 'Work Verification' }
+            { id: 'bookings', label: `Service Bookings (${bookings.length})` },
+            { id: 'estimates', label: 'Estimates & Invoices' },
+            { id: 'verification', label: 'Work Verification & Photos' },
+            { id: 'overview', label: 'My Profile & Security' }
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-3 text-sm font-semibold border-b-2 transition-colors ${
+              className={`py-3 text-xs sm:text-sm font-bold border-b-2 transition-all ${
                 activeTab === tab.id
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
@@ -376,6 +409,17 @@ const DashboardPage = () => {
           </div>
         )}
       </Modal>
+
+      {/* Booking Modal */}
+      {showBookingModal && (
+        <BookingModal
+          isOpen={showBookingModal}
+          onClose={() => {
+            setShowBookingModal(false);
+            loadCustomerBookings();
+          }}
+        />
+      )}
     </div>
   );
 };

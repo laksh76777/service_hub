@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../common/Modal';
 import Button from '../common/Button';
 import Input from '../common/Input';
-import { createBooking, getServices, getProviders, getMyAddresses, saveAddress } from '../../services/api';
+import { createBooking, getServices, getProviders, getMyAddresses, saveAddress, classifyServiceRequest } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const timeSlots = [
@@ -76,6 +76,48 @@ const BookingModal = ({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Phase 11: AI-Assisted Recommendation (Advisory Only)
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiError, setAiError] = useState('');
+
+  const handleAiAnalyze = async () => {
+    if (!problemDescription.trim()) {
+      setAiError('Please enter a brief problem description before analyzing.');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const res = await classifyServiceRequest(problemDescription.trim());
+      if (res.data?.success && res.data?.data) {
+        setAiResult(res.data.data);
+      } else {
+        setAiError('AI recommendation currently unavailable. You may continue manually.');
+      }
+    } catch (err) {
+      console.warn('AI analysis skipped, continuing manual workflow:', err);
+      setAiError('AI assistant could not complete request. You can continue booking manually.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const applyAiSuggestedService = () => {
+    if (!aiResult || !services.length) return;
+    const matched = services.find(
+      (s) =>
+        (aiResult.suggestedService && s.name.toLowerCase().includes(aiResult.suggestedService.toLowerCase())) ||
+        (aiResult.category === 'AC_REPAIR' && s.name.toLowerCase().includes('ac')) ||
+        (aiResult.category === 'PLUMBING' && s.name.toLowerCase().includes('plumb')) ||
+        (aiResult.category === 'ELECTRICAL' && s.name.toLowerCase().includes('electric')) ||
+        (aiResult.category === 'RO_WATER_PURIFIER' && s.name.toLowerCase().includes('ro'))
+    );
+    if (matched) {
+      setSelectedServiceId(matched._id);
+    }
+  };
 
   const fetchOptions = async () => {
     setLoadingOptions(true);
@@ -477,17 +519,109 @@ const BookingModal = ({
 
         {/* Problem Description */}
         <div className="pt-2 border-t border-slate-100">
-          <label className="block text-xs font-semibold text-slate-700 mb-1">
-            Describe the Problem / Scope of Work *
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-700">
+              Describe the Problem / Scope of Work *
+            </label>
+            <button
+              type="button"
+              onClick={handleAiAnalyze}
+              disabled={aiLoading}
+              className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+            >
+              {aiLoading ? (
+                <>
+                  <span className="inline-block animate-spin text-[10px]">⚙️</span>
+                  <span>Analyzing...</span>
+                </>
+              ) : (
+                <>
+                  <span>✨</span>
+                  <span>AI Assist (Advisory)</span>
+                </>
+              )}
+            </button>
+          </div>
           <textarea
             rows={3}
             value={problemDescription}
             onChange={(e) => setProblemDescription(e.target.value)}
-            placeholder="Please detail symptoms, appliance model, location of fixtures, urgency, or special instructions for the technician..."
+            placeholder="e.g. My AC starts normally but after some time it makes a loud noise and doesn't cool..."
             required
             className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
+
+          {aiError && (
+            <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-[11px] rounded flex justify-between items-center">
+              <span>{aiError}</span>
+              <button
+                type="button"
+                onClick={() => setAiError('')}
+                className="text-amber-500 hover:text-amber-700 text-xs ml-2"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {aiResult && (
+            <div className="mt-2 p-2.5 bg-gradient-to-r from-indigo-50/70 to-blue-50/70 border border-indigo-200 rounded-lg text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-medium text-indigo-950">
+                  <span>✨ AI Recommendation (Advisory Only)</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                      aiResult.urgency === 'HIGH'
+                        ? 'bg-red-100 text-red-700'
+                        : aiResult.urgency === 'MEDIUM'
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-emerald-100 text-emerald-700'
+                    }`}
+                  >
+                    {aiResult.urgency} Urgency
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiResult(null)}
+                  className="text-slate-400 hover:text-slate-600 text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="text-slate-700 text-[11px] leading-relaxed">
+                <p>
+                  <strong>Category:</strong> {aiResult.category} | <strong>Suggested:</strong>{' '}
+                  {aiResult.suggestedService}
+                </p>
+                {aiResult.possibleAreas?.length > 0 && (
+                  <p className="mt-0.5">
+                    <strong>Possible inspection areas:</strong> {aiResult.possibleAreas.join(', ')}
+                  </p>
+                )}
+                {aiResult.isAmbiguous && (
+                  <p className="text-amber-700 mt-1 italic">
+                    💡 Tip: {aiResult.clarificationPrompt}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-1 flex items-center justify-between border-t border-indigo-100 text-[10px] text-slate-500">
+                <span className="italic">
+                  Advisory only. Final diagnostics & prices are determined by verified technicians.
+                </span>
+                <button
+                  type="button"
+                  onClick={applyAiSuggestedService}
+                  className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-medium transition-colors"
+                >
+                  Apply Suggested Service
+                </button>
+              </div>
+            </div>
+          )}
+
           <p className="text-[11px] text-slate-400 mt-1">
             Pricing estimate is in Indian Rupees (₹). Payments will be collected in later phases.
           </p>

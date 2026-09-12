@@ -78,11 +78,72 @@ export const getBookings = (params = {}) => api.get('/bookings', { params });
 export const getBookingById = (id) => api.get(`/bookings/${id}`);
 export const updateBookingStatus = (id, data) => api.patch(`/bookings/${id}/status`, data);
 export const rescheduleBooking = (id, data) => api.patch(`/bookings/${id}/reschedule`, data);
+export const verifyBookingOtp = (id, data) => api.post(`/bookings/${id}/verify-otp`, data);
+export const updateJobExecution = (id, data) => api.patch(`/bookings/${id}/job-execution`, data);
 
 // Saved Addresses APIs
 export const getMyAddresses = () => api.get('/addresses');
 export const saveAddress = (data) => api.post('/addresses', data);
 export const deleteAddress = (id) => api.delete(`/addresses/${id}`);
 
+// Work Evidence & GridFS File APIs
+export const uploadBookingEvidence = (bookingId, formData) =>
+  api.post(`/bookings/${bookingId}/files`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  });
+export const getBookingEvidence = (bookingId, category = '') =>
+  api.get(`/bookings/${bookingId}/files${category ? `?category=${category}` : ''}`);
+export const deleteBookingEvidence = (fileId) => api.delete(`/files/${fileId}`);
+
+// Estimate APIs
+export const createEstimate = (bookingId, data) => api.post(`/bookings/${bookingId}/estimates`, data);
+export const getBookingEstimates = (bookingId) => api.get(`/bookings/${bookingId}/estimates`);
+export const approveEstimate = (estimateId) => api.patch(`/estimates/${estimateId}/approve`);
+export const rejectEstimate = (estimateId, data) => api.patch(`/estimates/${estimateId}/reject`, data);
+
+// Invoice APIs
+export const generateInvoice = (bookingId) => api.post(`/bookings/${bookingId}/invoices`);
+export const getBookingInvoice = (bookingId) => api.get(`/bookings/${bookingId}/invoices`);
+export const getInvoicePdfUrl = (invoiceId) => {
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  return `${base}/invoices/${invoiceId}/pdf`;
+};
+
+// Payment APIs (Phase 8 Demo Payment Gateway)
+export const createPaymentOrder = (bookingId) => api.post('/payments/orders', { bookingId });
+export const completePayment = (data) => api.post('/payments/complete', data);
+export const getPaymentHistory = (bookingId) => api.get(`/payments/booking/${bookingId}`);
+export const getPaymentById = (paymentId) => api.get(`/payments/${paymentId}`);
+
+// Warranty APIs (Phase 9)
+export const createWarranty = (data) => api.post('/warranties', data);
+export const getBookingWarranty = (bookingId) => api.get(`/warranties/booking/${bookingId}`);
+export const createWarrantyClaim = (warrantyId, data) => api.post(`/warranties/${warrantyId}/claims`, data);
+export const updateWarrantyClaimStatus = (claimId, data) => api.patch(`/warranties/claims/${claimId}/status`, data);
+
+// Dispute APIs (Phase 9)
+export const createDispute = (data) => api.post('/disputes', data);
+export const getBookingDispute = (bookingId) => api.get(`/disputes/booking/${bookingId}`);
+export const getDisputeById = (disputeId) => api.get(`/disputes/${disputeId}`);
+export const respondToDispute = (disputeId, data) => api.post(`/disputes/${disputeId}/respond`, data);
+export const resolveDispute = (disputeId, data) => api.patch(`/disputes/${disputeId}/resolve`, data);
+
+// Review APIs (Phase 9)
+export const createReview = (data) => api.post('/reviews', data);
+export const getBookingReview = (bookingId) => api.get(`/reviews/booking/${bookingId}`);
+export const getProviderReviews = (providerId) => api.get(`/reviews/provider/${providerId}`);
+
+// Notification APIs (Phase 9)
+export const getNotifications = (params = {}) => api.get('/notifications', { params });
+export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
+
+// AI Classification API (Phase 11)
+export const classifyServiceRequest = (description) => api.post('/ai/classify-request', { description });
+
 export default api;
+
+
 

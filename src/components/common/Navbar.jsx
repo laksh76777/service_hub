@@ -1,17 +1,35 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, mongoUser, isAuthenticated, logout } = useAuth();
 
   const navLinks = [
     { name: 'Services', path: '/services' },
     { name: 'Providers', path: '/providers' },
-    { name: 'Dashboard', path: '/dashboard' }
+    ...(isAuthenticated ? [{ name: 'Dashboard', path: '/dashboard' }] : [])
   ];
 
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
+
+  const roleBadgeColor = {
+    CUSTOMER: 'bg-blue-50 text-blue-700 border-blue-200',
+    PROVIDER: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    ADMIN: 'bg-purple-50 text-purple-700 border-purple-200'
+  }[mongoUser?.role || 'CUSTOMER'] || 'bg-slate-50 text-slate-700 border-slate-200';
 
   return (
     <nav className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
@@ -22,7 +40,9 @@ const Navbar = () => {
             <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-black text-base shadow-sm">
               S
             </div>
-            <span className="text-slate-900">Service<span className="text-blue-600">Hub</span></span>
+            <span className="text-slate-900">
+              Service<span className="text-blue-600">Hub</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -42,20 +62,41 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* Desktop Auth CTA */}
+          {/* Desktop Auth Controls */}
           <div className="hidden md:flex items-center gap-3">
-            <Link
-              to="/login"
-              className="text-sm font-medium text-slate-700 hover:text-slate-900 px-3.5 py-2 transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/register"
-              className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
-            >
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+                  <span className="font-semibold text-slate-800">
+                    {mongoUser?.name || user?.displayName || user?.email?.split('@')[0]}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${roleBadgeColor}`}>
+                    {mongoUser?.role || 'CUSTOMER'}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors border border-red-200"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-slate-700 hover:text-slate-900 px-3.5 py-2 transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -86,29 +127,51 @@ const Navbar = () => {
               to={link.path}
               onClick={() => setMobileMenuOpen(false)}
               className={`block px-3 py-2 rounded-lg text-base font-medium ${
-                isActive(link.path)
-                  ? 'text-blue-600 bg-blue-50'
-                  : 'text-slate-700 hover:bg-slate-50'
+                isActive(link.path) ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-slate-50'
               }`}
             >
               {link.name}
             </Link>
           ))}
           <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-            <Link
-              to="/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-center py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
-            >
-              Sign In
-            </Link>
-            <Link
-              to="/register"
-              onClick={() => setMobileMenuOpen(false)}
-              className="text-center py-2 text-sm font-medium bg-blue-600 text-white rounded-lg"
-            >
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <div className="p-2 text-xs bg-slate-50 rounded-lg flex items-center justify-between">
+                  <span className="font-semibold text-slate-800">
+                    {mongoUser?.name || user?.email}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${roleBadgeColor}`}>
+                    {mongoUser?.role || 'CUSTOMER'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="w-full text-center py-2 text-sm font-semibold text-red-600 bg-red-50 rounded-lg border border-red-200"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-center py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-center py-2 text-sm font-medium bg-blue-600 text-white rounded-lg"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

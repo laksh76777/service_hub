@@ -4,7 +4,9 @@ const {
   getBookings,
   getBookingById,
   transitionBookingStatus,
-  rescheduleBooking
+  rescheduleBooking,
+  verifyBookingOtp,
+  updateJobExecution
 } = require('../controllers/bookingController');
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { USER_ROLES } = require('../utils/constants');
@@ -29,4 +31,11 @@ router.patch('/:id/status', transitionBookingStatus);
 // Reschedule booking date/time
 router.patch('/:id/reschedule', rescheduleBooking);
 
+// Dedicated OTP verification (Arrival / Completion)
+router.post('/:id/verify-otp', verifyBookingOtp);
+
+// Update technician job execution notes and parts
+router.patch('/:id/job-execution', updateJobExecution);
+
 module.exports = router;
+

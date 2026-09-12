@@ -16,6 +16,11 @@ const warrantyClaimSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      index: true
+    },
     customerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -27,6 +32,12 @@ const warrantyClaimSchema = new mongoose.Schema(
       required: [true, 'Claim description is required'],
       trim: true
     },
+    evidenceFiles: [
+      {
+        type: String,
+        trim: true
+      }
+    ],
     status: {
       type: String,
       enum: Object.values(WARRANTY_CLAIM_STATUS),
@@ -46,6 +57,14 @@ const warrantyClaimSchema = new mongoose.Schema(
     collection: 'warranty_claims'
   }
 );
+
+warrantyClaimSchema.pre('validate', function () {
+  if (!this.claimNumber) {
+    const timestamp = Date.now().toString().slice(-4);
+    const random = Math.floor(1000 + Math.random() * 9000);
+    this.claimNumber = `CLM-${timestamp}-${random}`;
+  }
+});
 
 warrantyClaimSchema.index({ warrantyId: 1, status: 1 });
 warrantyClaimSchema.index({ customerId: 1, status: 1 });

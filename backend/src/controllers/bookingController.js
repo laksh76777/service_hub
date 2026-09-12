@@ -9,6 +9,17 @@ const { validateStatusTransition, canRescheduleBooking } = require('../utils/boo
  * Generates a human-friendly unique booking number
  * e.g. BK-2609-4821
  */
+/**
+ * Generates a 6-digit numeric OTP for customer verification
+ */
+const generateNumericOtp = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Generates a human-friendly unique booking number
+ * e.g. BK-2609-4821
+ */
 const generateBookingNumber = () => {
   const timestamp = Date.now().toString().slice(-4);
   const random = Math.floor(1000 + Math.random() * 9000);
@@ -121,6 +132,12 @@ const createBooking = async (req, res) => {
       }
     ];
 
+    const startOtp = {
+      code: generateNumericOtp(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days validity
+      attempts: 0
+    };
+
     const booking = new Booking({
       bookingNumber,
       customerId: req.user._id,
@@ -135,6 +152,12 @@ const createBooking = async (req, res) => {
         estimatedTotal,
         finalTotal: 0,
         currency: 'INR'
+      },
+      startOtp,
+      jobExecution: {
+        inspectionNotes: '',
+        workNotes: '',
+        partsUsed: []
       },
       statusHistory: initialStatusHistory,
       rescheduleHistory: []
@@ -244,9 +267,29 @@ const getBookingById = async (req, res) => {
       });
     }
 
+    const bookingObj = booking.toObject();
+
+    // Security: Unverified OTPs must NOT be exposed to the provider
+    if (isProvider && !isAdmin && !isCustomer) {
+      if (bookingObj.startOtp && !bookingObj.startOtp.verifiedAt) {
+        bookingObj.startOtp = {
+          hasOtp: true,
+          verifiedAt: null,
+          attempts: bookingObj.startOtp.attempts || 0
+        };
+      }
+      if (bookingObj.completionOtp && !bookingObj.completionOtp.verifiedAt) {
+        bookingObj.completionOtp = {
+          hasOtp: true,
+          verifiedAt: null,
+          attempts: bookingObj.completionOtp.attempts || 0
+        };
+      }
+    }
+
     return res.status(200).json({
       success: true,
-      booking
+      booking: bookingObj
     });
   } catch (error) {
     console.error('Error fetching booking details:', error);
@@ -263,7 +306,7 @@ const getBookingById = async (req, res) => {
  */
 const transitionBookingStatus = async (req, res) => {
   try {
-    const { status: nextStatus, reason } = req.body;
+    const { status: nextStatus, reason, otp } = req.body;
 
     if (!nextStatus) {
       return res.status(400).json({
@@ -309,6 +352,51 @@ const transitionBookingStatus = async (req, res) => {
         success: false,
         message: validation.reason
       });
+    }
+
+    booking.jobExecution = booking.jobExecution || {};
+
+    // Specific state handling
+    if (nextStatus === BOOKING_STATUS.TECHNICIAN_ARRIVED) {
+      if (otp) {
+        if (booking.startOtp && booking.startOtp.code && booking.startOtp.code !== otp.trim()) {
+          booking.startOtp.attempts = (booking.startOtp.attempts || 0) + 1;
+          await booking.save();
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid arrival OTP. Please obtain the correct 6-digit OTP from the customer.'
+          });
+        }
+        if (booking.startOtp) booking.startOtp.verifiedAt = new Date();
+      }
+      booking.jobExecution.technicianArrivedAt = booking.jobExecution.technicianArrivedAt || new Date();
+    } else if (nextStatus === BOOKING_STATUS.IN_PROGRESS) {
+      booking.jobExecution.workStartedAt = booking.jobExecution.workStartedAt || new Date();
+    } else if (nextStatus === BOOKING_STATUS.COMPLETION_PENDING) {
+      booking.jobExecution.completionPendingAt = new Date();
+      if (!booking.completionOtp || !booking.completionOtp.code) {
+        booking.completionOtp = {
+          code: generateNumericOtp(),
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000), // 48 hours validity
+          attempts: 0
+        };
+      }
+    } else if (nextStatus === BOOKING_STATUS.CUSTOMER_VERIFIED) {
+      if (actorRole === USER_ROLES.PROVIDER && otp) {
+        if (booking.completionOtp && booking.completionOtp.code && booking.completionOtp.code !== otp.trim()) {
+          booking.completionOtp.attempts = (booking.completionOtp.attempts || 0) + 1;
+          await booking.save();
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid completion OTP. Please verify with customer.'
+          });
+        }
+        if (booking.completionOtp) booking.completionOtp.verifiedAt = new Date();
+      } else if (actorRole === USER_ROLES.CUSTOMER) {
+        if (booking.completionOtp) booking.completionOtp.verifiedAt = new Date();
+      }
+    } else if (nextStatus === BOOKING_STATUS.COMPLETED) {
+      booking.jobExecution.completedAt = booking.jobExecution.completedAt || new Date();
     }
 
     // Apply transition
@@ -449,10 +537,241 @@ const rescheduleBooking = async (req, res) => {
   }
 };
 
+/**
+ * Dedicated endpoint to verify customer arrival or completion OTP
+ * POST /api/bookings/:id/verify-otp
+ */
+const verifyBookingOtp = async (req, res) => {
+  try {
+    const { type, otp } = req.body;
+
+    if (!type || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both type (ARRIVAL or COMPLETION) and otp are required.'
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found.'
+      });
+    }
+
+    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+
+    if (!isProvider && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only the assigned provider or admin can verify customer OTP.'
+      });
+    }
+
+    const normalizedType = type.toUpperCase();
+    const submittedOtp = otp.toString().trim();
+
+    booking.jobExecution = booking.jobExecution || {};
+
+    if (normalizedType === 'ARRIVAL' || normalizedType === 'START') {
+      if (booking.status !== BOOKING_STATUS.SCHEDULED) {
+        return res.status(400).json({
+          success: false,
+          message: `Arrival OTP can only be verified when booking is in SCHEDULED status. Current status: '${booking.status}'.`
+        });
+      }
+
+      if (!booking.startOtp || !booking.startOtp.code) {
+        return res.status(400).json({
+          success: false,
+          message: 'No arrival OTP found for this booking.'
+        });
+      }
+
+      if (booking.startOtp.code !== submittedOtp) {
+        booking.startOtp.attempts = (booking.startOtp.attempts || 0) + 1;
+        await booking.save();
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid arrival OTP. Please check with customer and try again.'
+        });
+      }
+
+      // Mark verified and transition to TECHNICIAN_ARRIVED
+      booking.startOtp.verifiedAt = new Date();
+      booking.jobExecution.technicianArrivedAt = new Date();
+      booking.status = BOOKING_STATUS.TECHNICIAN_ARRIVED;
+      booking.statusHistory.push({
+        previousStatus: BOOKING_STATUS.SCHEDULED,
+        newStatus: BOOKING_STATUS.TECHNICIAN_ARRIVED,
+        actor: {
+          userId: req.user._id,
+          role: req.user.role,
+          name: req.user.name || 'Provider'
+        },
+        reason: 'Customer arrival OTP verified successfully',
+        timestamp: new Date()
+      });
+
+      await booking.save();
+
+      const updatedBooking = await Booking.findById(booking._id)
+        .populate('serviceId', 'name description basePrice')
+        .populate('providerId', 'name email phone')
+        .populate('customerId', 'name email phone');
+
+      return res.status(200).json({
+        success: true,
+        message: 'Arrival OTP verified successfully. Technician checked in at job site.',
+        booking: updatedBooking
+      });
+    } else if (normalizedType === 'COMPLETION') {
+      if (booking.status !== BOOKING_STATUS.COMPLETION_PENDING) {
+        return res.status(400).json({
+          success: false,
+          message: `Completion OTP can only be verified when work is in COMPLETION_PENDING status. Current status: '${booking.status}'.`
+        });
+      }
+
+      if (!booking.completionOtp || !booking.completionOtp.code) {
+        return res.status(400).json({
+          success: false,
+          message: 'No completion OTP generated yet for this booking.'
+        });
+      }
+
+      if (booking.completionOtp.code !== submittedOtp) {
+        booking.completionOtp.attempts = (booking.completionOtp.attempts || 0) + 1;
+        await booking.save();
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid completion OTP. Please verify with customer and try again.'
+        });
+      }
+
+      // Mark verified and transition to CUSTOMER_VERIFIED
+      booking.completionOtp.verifiedAt = new Date();
+      booking.jobExecution.completedAt = new Date();
+      booking.status = BOOKING_STATUS.CUSTOMER_VERIFIED;
+      booking.statusHistory.push({
+        previousStatus: BOOKING_STATUS.COMPLETION_PENDING,
+        newStatus: BOOKING_STATUS.CUSTOMER_VERIFIED,
+        actor: {
+          userId: req.user._id,
+          role: req.user.role,
+          name: req.user.name || 'Provider'
+        },
+        reason: 'Customer completion OTP verified successfully',
+        timestamp: new Date()
+      });
+
+      await booking.save();
+
+      const updatedBooking = await Booking.findById(booking._id)
+        .populate('serviceId', 'name description basePrice')
+        .populate('providerId', 'name email phone')
+        .populate('customerId', 'name email phone');
+
+      return res.status(200).json({
+        success: true,
+        message: 'Completion OTP verified successfully. Work is customer-verified.',
+        booking: updatedBooking
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP type. Must be 'ARRIVAL' or 'COMPLETION'."
+      });
+    }
+  } catch (error) {
+    console.error('Error verifying booking OTP:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to verify OTP.'
+    });
+  }
+};
+
+/**
+ * Update technician job execution notes and parts used
+ * PATCH /api/bookings/:id/job-execution
+ */
+const updateJobExecution = async (req, res) => {
+  try {
+    const { inspectionNotes, workNotes, partsUsed } = req.body;
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found.'
+      });
+    }
+
+    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+
+    if (!isProvider && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only the assigned provider or admin can update job execution details.'
+      });
+    }
+
+    booking.jobExecution = booking.jobExecution || {};
+
+    if (inspectionNotes !== undefined) {
+      booking.jobExecution.inspectionNotes = inspectionNotes.trim();
+    }
+    if (workNotes !== undefined) {
+      booking.jobExecution.workNotes = workNotes.trim();
+    }
+    if (Array.isArray(partsUsed)) {
+      booking.jobExecution.partsUsed = partsUsed.map((p) => ({
+        name: (p.name || 'Part/Consumable').trim(),
+        quantity: Math.max(1, parseInt(p.quantity, 10) || 1),
+        cost: Math.max(0, parseFloat(p.cost) || 0)
+      }));
+
+      // Update pricing final total with parts cost
+      const partsTotal = booking.jobExecution.partsUsed.reduce(
+        (sum, p) => sum + p.cost * p.quantity,
+        0
+      );
+      const basePrice = booking.pricing?.estimatedTotal || 0;
+      booking.pricing.finalTotal = basePrice + partsTotal;
+    }
+
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate('serviceId', 'name description basePrice')
+      .populate('providerId', 'name email phone')
+      .populate('customerId', 'name email phone');
+
+    return res.status(200).json({
+      success: true,
+      message: 'Job execution details updated successfully.',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Error updating job execution:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update job execution details.'
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   getBookings,
   getBookingById,
   transitionBookingStatus,
-  rescheduleBooking
+  rescheduleBooking,
+  verifyBookingOtp,
+  updateJobExecution
 };
+

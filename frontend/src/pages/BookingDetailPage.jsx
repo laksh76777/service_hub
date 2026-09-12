@@ -3,6 +3,14 @@ import { useParams, Link } from 'react-router-dom';
 import { getBookingById, updateBookingStatus, rescheduleBooking } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BookingTimeline from '../components/booking/BookingTimeline';
+import JobExecutionCard from '../components/booking/JobExecutionCard';
+import WorkEvidenceGallery from '../components/booking/WorkEvidenceGallery';
+import EstimateManager from '../components/booking/EstimateManager';
+import InvoiceCard from '../components/booking/InvoiceCard';
+import PaymentHistoryCard from '../components/booking/PaymentHistoryCard';
+import WarrantyCard from '../components/booking/WarrantyCard';
+import DisputeCard from '../components/booking/DisputeCard';
+import ReviewCard from '../components/booking/ReviewCard';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
@@ -371,9 +379,20 @@ const BookingDetailPage = () => {
         <BookingTimeline currentStatus={booking.status} statusHistory={booking.statusHistory || []} />
       </div>
 
+      {/* Phase 6: Job Execution & Customer/Technician OTP Verification */}
+      <div className="mb-6">
+        <JobExecutionCard
+          booking={booking}
+          isCustomer={isCustomer}
+          isProvider={isProvider}
+          isAdmin={isAdmin}
+          onBookingUpdated={(updated) => setBooking(updated)}
+        />
+      </div>
+
       {/* Detail Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Service & Location */}
+        {/* Left 2 Cols: Service & Location & GridFS Work Evidence */}
         <div className="md:col-span-2 space-y-6">
           <Card title="Job Details & Scope of Work">
             <div className="space-y-4 text-xs">
@@ -422,6 +441,60 @@ const BookingDetailPage = () => {
               </div>
             </div>
           </Card>
+
+          {/* Phase 7: Estimates & Scope Approvals */}
+          <EstimateManager
+            bookingId={booking._id}
+            isCustomer={isCustomer}
+            isProvider={isProvider}
+            isAdmin={isAdmin}
+            onBookingUpdated={fetchBooking}
+          />
+
+          {/* Phase 6: MongoDB GridFS Work Evidence Gallery */}
+          <WorkEvidenceGallery
+            bookingId={booking._id}
+            canUpload={isCustomer || isProvider || isAdmin}
+            canDelete={isProvider || isAdmin}
+          />
+
+          {/* Phase 7: Final Tax Invoice & PDF Download */}
+          <InvoiceCard
+            booking={booking}
+            isCustomer={isCustomer}
+            isProvider={isProvider}
+            isAdmin={isAdmin}
+            onInvoiceCreated={fetchBooking}
+          />
+
+          {/* Phase 8: Demo Payment Gateway Transactions & Reconciliation */}
+          <PaymentHistoryCard
+            bookingId={booking._id}
+            refreshTrigger={booking.status}
+          />
+
+          {/* Phase 9: Service Warranty & Claims */}
+          <WarrantyCard
+            booking={booking}
+            isCustomer={isCustomer}
+            isProvider={isProvider}
+            isAdmin={isAdmin}
+          />
+
+          {/* Phase 9: Verified Service Review */}
+          <ReviewCard
+            booking={booking}
+            isCustomer={isCustomer}
+          />
+
+          {/* Phase 9: Dispute Resolution & Mediation */}
+          <DisputeCard
+            booking={booking}
+            isCustomer={isCustomer}
+            isProvider={isProvider}
+            isAdmin={isAdmin}
+            onDisputeUpdated={fetchBooking}
+          />
 
           {/* Reschedule history log if any */}
           {booking.rescheduleHistory?.length > 0 && (
@@ -476,17 +549,37 @@ const BookingDetailPage = () => {
             </div>
           </Card>
 
-          <Card title="Estimated Pricing">
-            <div className="space-y-2 text-xs">
+          <Card title="Pricing & Payment Status">
+            <div className="space-y-3 text-xs">
               <div className="flex justify-between items-center">
-                <span className="text-slate-500">Service Base / Estimate:</span>
-                <span className="text-base font-black text-slate-900">
-                  ₹{booking.pricing?.estimatedTotal || 0}
+                <span className="text-slate-500">
+                  {booking.pricing?.isPaid || booking.status === 'COMPLETED' ? 'Total Settled:' : 'Service Base / Estimate:'}
+                </span>
+                <span className="text-base font-black text-slate-900 dark:text-white">
+                  ₹{booking.pricing?.finalTotal || booking.pricing?.estimatedTotal || 0}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">
-                Final total and invoices are generated upon customer work sign-off. Payments will be implemented in the next phase.
-              </p>
+
+              {booking.pricing?.isPaid || booking.status === 'COMPLETED' ? (
+                <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 font-bold flex items-center justify-between text-[11px]">
+                  <span>✓ Paid in Full</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">DEMO GATEWAY</span>
+                </div>
+              ) : (
+                <>
+                  <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-500 text-[11px]">
+                    Invoice is compiled from approved estimates upon verification.
+                  </div>
+                  {isCustomer && ['CUSTOMER_VERIFIED', 'COMPLETION_PENDING'].includes(booking.status) && (
+                    <Link
+                      to={`/checkout/${booking._id}`}
+                      className="block w-full py-2 px-3 text-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors shadow-sm"
+                    >
+                      💳 Checkout & Pay (Demo)
+                    </Link>
+                  )}
+                </>
+              )}
             </div>
           </Card>
         </div>

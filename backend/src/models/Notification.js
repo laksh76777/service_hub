@@ -9,6 +9,10 @@ const notificationSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
     type: {
       type: String,
       enum: Object.values(NOTIFICATION_TYPE),
@@ -33,6 +37,9 @@ const notificationSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
       index: true
+    },
+    readAt: {
+      type: Date
     }
   },
   {

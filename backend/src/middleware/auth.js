@@ -42,12 +42,23 @@ const requireAuth = async (req, res, next) => {
     // Lookup user in MongoDB by verified Firebase UID
     let user = await User.findOne({ firebaseUid });
 
-    // If user does not exist in MongoDB, create the profile on first authenticated access
+    // If not found by UID, check if a pre-seeded account exists for this email
+    if (!user && email) {
+      user = await User.findOne({ email: email.toLowerCase().trim() });
+      if (user) {
+        user.firebaseUid = firebaseUid;
+        if (!user.name && tokenName) user.name = tokenName;
+        await user.save();
+        console.log(`[Auth Middleware] Bound Firebase UID (${firebaseUid}) to pre-seeded user: ${user.email} (Role: ${user.role})`);
+      }
+    }
+
+    // If user still does not exist in MongoDB, create the profile on first authenticated access
     if (!user) {
       const fallbackName = tokenName || (email ? email.split('@')[0] : 'User');
       user = await User.create({
         firebaseUid,
-        email: email || `${firebaseUid}@servicehub.local`,
+        email: email ? email.toLowerCase().trim() : `${firebaseUid}@servicehub.local`,
         name: fallbackName,
         phone: null,
         role: USER_ROLES.CUSTOMER, // Security: Default to CUSTOMER, never trust unverified input

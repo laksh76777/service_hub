@@ -9,7 +9,15 @@ const config = {
   mongodbUri: process.env.MONGODB_URI,
   mongodbDbName: process.env.MONGODB_DB_NAME || 'servicehub',
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID || 'studio-9993233645-6a791',
-  firebaseServiceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || null
+  firebaseServiceAccount: process.env.FIREBASE_SERVICE_ACCOUNT || null,
+  paymentMode: process.env.PAYMENT_MODE || 'demo',
+  redis: {
+    host: process.env.REDIS_HOST || '127.0.0.1',
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    url: process.env.REDIS_URL || undefined,
+    enableOfflineQueue: false
+  }
 };
 
 module.exports = config;

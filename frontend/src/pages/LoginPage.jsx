@@ -6,6 +6,14 @@ import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 
+const DEMO_ACCOUNTS = [
+  { role: 'Admin', email: 'abc@gmail.com', label: '👑 Demo Admin', desc: 'Full dispute arbitration & ledger oversight' },
+  { role: 'Customer', email: 'laksh@gmail.com', label: '👤 Demo Customer', desc: 'Laksh Suthar (Indiranagar, Bengaluru)' },
+  { role: 'AC Technician', email: 'ac.tech@servicehub.demo', label: '❄️ AC Tech Pro', desc: 'Rahul Sharma (CoolCare Services)' },
+  { role: 'Plumber', email: 'plumber@servicehub.demo', label: '🚰 Plumber Pro', desc: 'Imran Khan (QuickFix Plumbing)' },
+  { role: 'Electrician', email: 'electrician@servicehub.demo', label: '⚡ Electrician Pro', desc: 'Arjun Patel (PowerFix Electricals)' }
+];
+
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,6 +39,12 @@ const LoginPage = () => {
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, from]);
+
+  const handleQuickFill = (demoEmail) => {
+    setEmail(demoEmail);
+    setPassword('123456');
+    setErrorMessage('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,71 +101,110 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
-        <Card
-          title="Sign in to ServiceHub"
-          subtitle="Access your bookings, estimates, and verified jobs"
-        >
-          {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-2">
-              <span className="font-bold">Error:</span> {errorMessage}
-            </div>
-          )}
-
-          {successMessage && (
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg">
-              {successMessage}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="block text-xs font-semibold text-slate-700">Password</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResetEmail(email);
-                    setShowResetModal(true);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Forgot password?
-                </button>
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        {/* Left: Sign In Form */}
+        <div className="md:col-span-7">
+          <Card
+            title="Welcome Back to ServiceHub"
+            subtitle="Sign in with your verified credentials"
+          >
+            {errorMessage && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                <span className="font-bold">Error:</span> {errorMessage}
               </div>
+            )}
+
+            {successMessage && (
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl">
+                {successMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                label="Email Address"
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
               />
-            </div>
 
-            <div className="pt-2">
-              <Button type="submit" variant="primary" className="w-full" disabled={loading}>
-                {loading ? 'Signing In...' : 'Sign In'}
-              </Button>
-            </div>
-          </form>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResetEmail(email);
+                      setShowResetModal(true);
+                    }}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <Input
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-blue-600 font-semibold hover:underline">
-              Create an account
-            </Link>
+              <div className="pt-2">
+                <Button type="submit" variant="primary" className="w-full shadow-md shadow-blue-500/20" disabled={loading}>
+                  {loading ? 'Signing In...' : 'Sign In to Account →'}
+                </Button>
+              </div>
+            </form>
+
+            <div className="mt-6 text-center text-xs text-slate-500">
+              Don't have an account?{' '}
+              <Link to="/register" className="text-blue-600 font-semibold hover:underline">
+                Create new customer account
+              </Link>
+            </div>
+          </Card>
+        </div>
+
+        {/* Right: 1-Click Demo Accounts */}
+        <div className="md:col-span-5 p-6 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 text-white border border-slate-800 shadow-xl space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">⚡</span>
+            <div>
+              <h3 className="text-sm font-bold text-white">1-Click Demo Accounts</h3>
+              <p className="text-[11px] text-slate-400">Click any role to autofill credentials</p>
+            </div>
           </div>
-        </Card>
+
+          <div className="space-y-2 pt-2">
+            {DEMO_ACCOUNTS.map((acc) => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => handleQuickFill(acc.email)}
+                className="w-full text-left p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/50 transition-all flex flex-col gap-0.5 group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">
+                    {acc.label}
+                  </span>
+                  <span className="text-[10px] text-blue-400 font-mono">Autofill →</span>
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono">{acc.email}</span>
+                <span className="text-[10px] text-slate-500 mt-0.5">{acc.desc}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="pt-3 border-t border-white/10 text-[10px] text-slate-400 flex items-center gap-1.5">
+            <span>🔒</span>
+            <span>Demo accounts authenticate safely via Firebase Auth.</span>
+          </div>
+        </div>
       </div>
 
       {/* Password Reset Modal */}
@@ -162,7 +215,7 @@ const LoginPage = () => {
       >
         <form onSubmit={handlePasswordReset} className="space-y-4">
           <p className="text-sm text-slate-600">
-            Enter the email address associated with your account and we will send you a link to reset your password.
+            Enter your email address and we will send you a secure password reset link.
           </p>
 
           {resetError && (

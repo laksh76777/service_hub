@@ -170,7 +170,36 @@ const bookingSchema = new mongoose.Schema(
     pricing: {
       estimatedTotal: { type: Number, default: 0 },
       finalTotal: { type: Number, default: 0 },
-      currency: { type: String, default: 'INR' }
+      currency: { type: String, default: 'INR' },
+      isPaid: { type: Boolean, default: false },
+      paidAt: { type: Date }
+    },
+    startOtp: {
+      code: { type: String, trim: true },
+      expiresAt: { type: Date },
+      verifiedAt: { type: Date },
+      attempts: { type: Number, default: 0 }
+    },
+    completionOtp: {
+      code: { type: String, trim: true },
+      expiresAt: { type: Date },
+      verifiedAt: { type: Date },
+      attempts: { type: Number, default: 0 }
+    },
+    jobExecution: {
+      inspectionNotes: { type: String, trim: true, default: '' },
+      workNotes: { type: String, trim: true, default: '' },
+      partsUsed: [
+        {
+          name: { type: String, required: true, trim: true },
+          quantity: { type: Number, default: 1, min: 1 },
+          cost: { type: Number, default: 0, min: 0 }
+        }
+      ],
+      technicianArrivedAt: { type: Date },
+      workStartedAt: { type: Date },
+      completionPendingAt: { type: Date },
+      completedAt: { type: Date }
     },
     statusHistory: [statusHistorySchema],
     rescheduleHistory: [rescheduleSchema]

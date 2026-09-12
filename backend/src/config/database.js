@@ -16,36 +16,47 @@ const connectDB = async () => {
     throw new Error('MONGODB_URI is not defined in environment variables');
   }
 
-  try {
-    const conn = await mongoose.connect(uri, {
-      dbName: dbName,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000
-    });
+  const maxRetries = 3;
+  let attempt = 0;
 
-    isConnected = true;
-    console.log(`MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+  while (attempt < maxRetries) {
+    attempt++;
+    try {
+      const conn = await mongoose.connect(uri, {
+        dbName: dbName,
+        serverSelectionTimeoutMS: 15000,
+        socketTimeoutMS: 45000
+      });
 
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-      isConnected = false;
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.warn('MongoDB disconnected. Attempting reconnection...');
-      isConnected = false;
-    });
-
-    mongoose.connection.on('reconnected', () => {
-      console.log('MongoDB reconnected successfully');
       isConnected = true;
-    });
+      console.log(`MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
 
-    return conn;
-  } catch (error) {
-    isConnected = false;
-    console.error('Failed to connect to MongoDB Atlas:', error.message);
-    throw error;
+      mongoose.connection.on('error', (err) => {
+        console.error('MongoDB connection error:', err);
+        isConnected = false;
+      });
+
+      mongoose.connection.on('disconnected', () => {
+        console.warn('MongoDB disconnected. Attempting reconnection...');
+        isConnected = false;
+      });
+
+      mongoose.connection.on('reconnected', () => {
+        console.log('MongoDB reconnected successfully');
+        isConnected = true;
+      });
+
+      return conn;
+    } catch (error) {
+      isConnected = false;
+      console.warn(`[MongoDB] Connection attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+      if (attempt >= maxRetries) {
+        console.error('Failed to connect to MongoDB Atlas after all retries:', error.message);
+        throw error;
+      }
+      // Exponential backoff
+      await new Promise((r) => setTimeout(r, attempt * 1500));
+    }
   }
 };
 

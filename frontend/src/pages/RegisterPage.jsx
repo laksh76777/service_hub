@@ -64,53 +64,57 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-[75vh] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-lg">
         <Card
-          title="Create your account"
-          subtitle="Join ServiceHub as a client or verified service provider"
+          title="Create your ServiceHub account"
+          subtitle="Join India's verified local home service and work verification network"
         >
           {errorMessage && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
               <span className="font-bold">Error:</span> {errorMessage}
             </div>
           )}
 
           {/* Account Role Selector */}
-          <div className="mb-4">
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-              I am signing up as
+          <div className="mb-5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+              I am registering as:
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setRole('customer')}
-                className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                className={`p-3 text-left rounded-xl border transition-all ${
                   role === 'customer'
-                    ? 'bg-blue-50 border-blue-600 text-blue-700 font-bold'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                Customer
+                <div className="text-sm font-bold text-slate-900">👤 Customer</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Book &amp; verify home repairs</div>
               </button>
+
               <button
                 type="button"
                 onClick={() => setRole('provider')}
-                className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                className={`p-3 text-left rounded-xl border transition-all ${
                   role === 'provider'
-                    ? 'bg-blue-50 border-blue-600 text-blue-700 font-bold'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    ? 'bg-blue-50/80 border-blue-600 ring-2 ring-blue-500/20 shadow-xs'
+                    : 'border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
               >
-                Service Provider
+                <div className="text-sm font-bold text-slate-900">🔧 Service Provider</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">Technician / business pro</div>
               </button>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Full Name"
-              placeholder="e.g. John Doe"
+              type="text"
+              placeholder="e.g. Laksh Suthar"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
@@ -118,43 +122,46 @@ const RegisterPage = () => {
 
             {role === 'provider' && (
               <Input
-                label="Business / Trade Name"
-                placeholder="e.g. Apex Electric LLC"
+                label="Registered Business / Enterprise Name"
+                type="text"
+                placeholder="e.g. CoolCare Air Conditioning Services"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 required
               />
             )}
 
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Email Address"
+                type="email"
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+
+              <Input
+                label="Mobile Phone (+91)"
+                type="tel"
+                placeholder="98765 43210"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
 
             <Input
-              label="Phone Number (Optional)"
-              type="tel"
-              placeholder="+1 (555) 000-0000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-
-            <Input
-              label="Password"
+              label="Password (min. 6 characters)"
               type="password"
-              placeholder="Minimum 6 characters"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
 
             <div className="pt-2">
-              <Button type="submit" variant="primary" className="w-full" disabled={loading}>
-                {loading ? 'Creating Account...' : `Register as ${role === 'customer' ? 'Customer' : 'Provider'}`}
+              <Button type="submit" variant="primary" className="w-full shadow-md shadow-blue-500/20" disabled={loading}>
+                {loading ? 'Creating Account...' : 'Complete Registration →'}
               </Button>
             </div>
           </form>
@@ -162,7 +169,7 @@ const RegisterPage = () => {
           <div className="mt-6 text-center text-xs text-slate-500">
             Already have an account?{' '}
             <Link to="/login" className="text-blue-600 font-semibold hover:underline">
-              Sign In
+              Sign in to account
             </Link>
           </div>
         </Card>

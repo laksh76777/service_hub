@@ -15,6 +15,11 @@ const addressSchema = new mongoose.Schema(
       enum: ['home', 'work', 'job_site', 'billing'],
       default: 'home'
     },
+    label: {
+      type: String,
+      trim: true,
+      default: 'home'
+    },
     // Primary Indian address fields
     addressLine1: {
       type: String,

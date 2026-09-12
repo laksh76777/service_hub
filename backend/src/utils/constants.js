@@ -59,20 +59,19 @@ const BOOKING_STATUS = Object.freeze({
 });
 
 const ESTIMATE_STATUS = Object.freeze({
-  DRAFT: 'draft',
-  SENT: 'sent',
-  APPROVED: 'approved',
-  REJECTED: 'rejected',
-  EXPIRED: 'expired',
-  REVISED: 'revised'
+  DRAFT: 'DRAFT',
+  PENDING_CUSTOMER: 'PENDING_CUSTOMER',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  EXPIRED: 'EXPIRED',
+  SUPERSEDED: 'SUPERSEDED'
 });
 
 const ESTIMATE_ITEM_TYPE = Object.freeze({
-  LABOR: 'labor',
-  MATERIAL: 'material',
-  EQUIPMENT: 'equipment',
-  FEE: 'fee',
-  OTHER: 'other'
+  LABOUR: 'LABOUR',
+  PART: 'PART',
+  SERVICE: 'SERVICE',
+  OTHER: 'OTHER'
 });
 
 const JOB_UPDATE_TYPE = Object.freeze({
@@ -85,13 +84,12 @@ const JOB_UPDATE_TYPE = Object.freeze({
 });
 
 const INVOICE_STATUS = Object.freeze({
-  DRAFT: 'draft',
-  ISSUED: 'issued',
-  PARTIALLY_PAID: 'partially_paid',
-  PAID: 'paid',
-  OVERDUE: 'overdue',
-  VOID: 'void',
-  REFUNDED: 'refunded'
+  DRAFT: 'DRAFT',
+  ISSUED: 'ISSUED',
+  PARTIALLY_PAID: 'PARTIALLY_PAID',
+  PAID: 'PAID',
+  REFUNDED: 'REFUNDED',
+  CANCELLED: 'CANCELLED'
 });
 
 const INVOICE_ITEM_TYPE = Object.freeze({
@@ -103,11 +101,17 @@ const INVOICE_ITEM_TYPE = Object.freeze({
 });
 
 const PAYMENT_STATUS = Object.freeze({
-  PENDING: 'pending',
-  AUTHORIZED: 'authorized',
-  CAPTURED: 'captured',
-  FAILED: 'failed',
-  REFUNDED: 'refunded'
+  CREATED: 'CREATED',
+  PENDING: 'PENDING',
+  SUCCESS: 'SUCCESS',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+  REFUNDED: 'REFUNDED'
+});
+
+const PAYMENT_GATEWAY = Object.freeze({
+  DEMO: 'DEMO',
+  RAZORPAY: 'RAZORPAY'
 });
 
 const PAYMENT_METHOD = Object.freeze({
@@ -125,49 +129,62 @@ const REFUND_STATUS = Object.freeze({
 });
 
 const WARRANTY_STATUS = Object.freeze({
-  ACTIVE: 'active',
-  EXPIRED: 'expired',
-  CLAIMED: 'claimed',
-  VOID: 'void'
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  CLAIMED: 'CLAIMED',
+  VOID: 'VOID'
 });
 
 const WARRANTY_CLAIM_STATUS = Object.freeze({
-  SUBMITTED: 'submitted',
-  UNDER_REVIEW: 'under_review',
-  INSPECTION_SCHEDULED: 'inspection_scheduled',
-  APPROVED: 'approved',
-  REJECTED: 'rejected',
-  RESOLVED: 'resolved'
+  SUBMITTED: 'SUBMITTED',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  RESOLVED: 'RESOLVED'
 });
 
 const DISPUTE_STATUS = Object.freeze({
-  OPEN: 'open',
-  UNDER_INVESTIGATION: 'under_investigation',
-  MEDIATION: 'mediation',
-  RESOLVED_CUSTOMER_FAVOR: 'resolved_customer_favor',
-  RESOLVED_PROVIDER_FAVOR: 'resolved_provider_favor',
-  CLOSED: 'closed'
+  OPEN: 'OPEN',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  WAITING_FOR_PROVIDER: 'WAITING_FOR_PROVIDER',
+  WAITING_FOR_CUSTOMER: 'WAITING_FOR_CUSTOMER',
+  RESOLVED: 'RESOLVED',
+  REJECTED: 'REJECTED',
+  CANCELLED: 'CANCELLED'
+});
+
+const DISPUTE_RESOLUTION = Object.freeze({
+  FULL_REFUND: 'FULL_REFUND',
+  PARTIAL_REFUND: 'PARTIAL_REFUND',
+  REWORK: 'REWORK',
+  NO_ACTION: 'NO_ACTION'
 });
 
 const DISPUTE_REASON = Object.freeze({
-  QUALITY_OF_WORK: 'quality_of_work',
-  INCOMPLETE_WORK: 'incomplete_work',
-  BILLING_DISCREPANCY: 'billing_discrepancy',
-  DAMAGE_CAUSED: 'damage_caused',
-  UNPROFESSIONAL_CONDUCT: 'unprofessional_conduct',
-  OTHER: 'other'
+  QUALITY_OF_WORK: 'QUALITY_OF_WORK',
+  INCOMPLETE_WORK: 'INCOMPLETE_WORK',
+  BILLING_DISCREPANCY: 'BILLING_DISCREPANCY',
+  DAMAGE_CAUSED: 'DAMAGE_CAUSED',
+  UNPROFESSIONAL_CONDUCT: 'UNPROFESSIONAL_CONDUCT',
+  OTHER: 'OTHER'
 });
 
 const NOTIFICATION_TYPE = Object.freeze({
-  BOOKING_UPDATE: 'booking_update',
-  ESTIMATE_RECEIVED: 'estimate_received',
-  ESTIMATE_APPROVED: 'estimate_approved',
-  JOB_STARTED: 'job_started',
-  JOB_COMPLETED: 'job_completed',
-  PAYMENT_SUCCESS: 'payment_success',
-  WARRANTY_ALERT: 'warranty_alert',
-  DISPUTE_UPDATE: 'dispute_update',
-  SYSTEM: 'system'
+  BOOKING_REQUESTED: 'BOOKING_REQUESTED',
+  BOOKING_ACCEPTED: 'BOOKING_ACCEPTED',
+  BOOKING_REJECTED: 'BOOKING_REJECTED',
+  BOOKING_RESCHEDULED: 'BOOKING_RESCHEDULED',
+  ESTIMATE_CREATED: 'ESTIMATE_CREATED',
+  ESTIMATE_APPROVED: 'ESTIMATE_APPROVED',
+  ESTIMATE_REJECTED: 'ESTIMATE_REJECTED',
+  ADDITIONAL_WORK_REQUESTED: 'ADDITIONAL_WORK_REQUESTED',
+  JOB_COMPLETED: 'JOB_COMPLETED',
+  PAYMENT_SUCCESS: 'PAYMENT_SUCCESS',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
+  WARRANTY_CLAIM_CREATED: 'WARRANTY_CLAIM_CREATED',
+  DISPUTE_CREATED: 'DISPUTE_CREATED',
+  DISPUTE_UPDATED: 'DISPUTE_UPDATED',
+  SYSTEM: 'SYSTEM'
 });
 
 const LEDGER_ENTRY_TYPE = Object.freeze({
@@ -194,12 +211,15 @@ module.exports = {
   INVOICE_STATUS,
   INVOICE_ITEM_TYPE,
   PAYMENT_STATUS,
+  PAYMENT_GATEWAY,
   PAYMENT_METHOD,
   REFUND_STATUS,
   WARRANTY_STATUS,
   WARRANTY_CLAIM_STATUS,
   DISPUTE_STATUS,
+  DISPUTE_RESOLUTION,
   DISPUTE_REASON,
   NOTIFICATION_TYPE,
   LEDGER_ENTRY_TYPE
 };
+

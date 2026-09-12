@@ -1,5 +1,52 @@
 const mongoose = require('mongoose');
-const { ESTIMATE_STATUS } = require('../utils/constants');
+const { ESTIMATE_STATUS, ESTIMATE_ITEM_TYPE } = require('../utils/constants');
+
+const estimateItemSchema = new mongoose.Schema(
+  {
+    description: {
+      type: String,
+      required: [true, 'Item description is required'],
+      trim: true
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 1
+    },
+    unitPrice: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    amount: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0
+    },
+    totalPrice: {
+      type: Number,
+      default: 0
+    },
+    type: {
+      type: String,
+      enum: Object.values(ESTIMATE_ITEM_TYPE),
+      default: ESTIMATE_ITEM_TYPE.LABOUR
+    }
+  },
+  { _id: true }
+);
+
+// Backward-compatible amount/totalPrice synchronization
+estimateItemSchema.pre('validate', function () {
+  if (this.amount === undefined && this.totalPrice !== undefined) {
+    this.amount = this.totalPrice;
+  } else if (this.totalPrice === undefined && this.amount !== undefined) {
+    this.totalPrice = this.amount;
+  }
+});
 
 const estimateSchema = new mongoose.Schema(
   {
@@ -28,16 +75,30 @@ const estimateSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-    version: {
-      type: Number,
-      default: 1
+    isAdditionalWork: {
+      type: Boolean,
+      default: false,
+      index: true
     },
+    parentEstimateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Estimate'
+    },
+    items: [estimateItemSchema],
     subtotal: {
       type: Number,
       required: true,
       default: 0
     },
+    taxes: {
+      type: Number,
+      default: 0
+    },
     tax: {
+      type: Number,
+      default: 0
+    },
+    discount: {
       type: Number,
       default: 0
     },
@@ -52,10 +113,23 @@ const estimateSchema = new mongoose.Schema(
       default: ESTIMATE_STATUS.DRAFT,
       index: true
     },
-    approvedAt: { type: Date },
-    rejectedAt: { type: Date },
-    rejectionReason: { type: String },
-    notes: { type: String }
+    notes: {
+      type: String,
+      trim: true
+    },
+    rejectionReason: {
+      type: String,
+      trim: true
+    },
+    expiresAt: {
+      type: Date
+    },
+    approvedAt: {
+      type: Date
+    },
+    rejectedAt: {
+      type: Date
+    }
   },
   {
     timestamps: true,
@@ -63,7 +137,15 @@ const estimateSchema = new mongoose.Schema(
   }
 );
 
-estimateSchema.index({ bookingId: 1, version: -1 });
+estimateSchema.pre('validate', function () {
+  if (this.taxes === undefined && this.tax !== undefined) {
+    this.taxes = this.tax;
+  } else if (this.tax === undefined && this.taxes !== undefined) {
+    this.tax = this.taxes;
+  }
+});
+
+estimateSchema.index({ bookingId: 1, status: 1 });
 estimateSchema.index({ customerId: 1, status: 1 });
 estimateSchema.index({ providerId: 1, status: 1 });
 

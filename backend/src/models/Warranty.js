@@ -59,6 +59,14 @@ const warrantySchema = new mongoose.Schema(
   }
 );
 
+warrantySchema.pre('validate', function () {
+  if (!this.warrantyCode) {
+    const timestamp = Date.now().toString().slice(-4);
+    const random = Math.floor(1000 + Math.random() * 9000);
+    this.warrantyCode = `WAR-${timestamp}-${random}`;
+  }
+});
+
 warrantySchema.index({ customerId: 1, status: 1 });
 warrantySchema.index({ endDate: 1, status: 1 });
 

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { PAYMENT_STATUS, PAYMENT_METHOD } = require('../utils/constants');
+const { PAYMENT_STATUS, PAYMENT_GATEWAY } = require('../utils/constants');
 
 const paymentSchema = new mongoose.Schema(
   {
@@ -8,12 +8,6 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
-      index: true
-    },
-    invoiceId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Invoice',
-      required: true,
       index: true
     },
     bookingId: {
@@ -28,30 +22,63 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    providerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
+    invoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Invoice',
+      index: true
+    },
     amount: {
       type: Number,
-      required: true
+      required: true,
+      min: 0
     },
     currency: {
       type: String,
-      default: 'INR'
+      default: 'INR',
+      uppercase: true,
+      trim: true
     },
-    method: {
+    gateway: {
       type: String,
-      enum: Object.values(PAYMENT_METHOD),
-      required: true
+      enum: Object.values(PAYMENT_GATEWAY),
+      default: PAYMENT_GATEWAY.DEMO
+    },
+    gatewayOrderId: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    gatewayPaymentId: {
+      type: String,
+      trim: true,
+      index: true
+    },
+    transactionId: {
+      type: String,
+      trim: true,
+      index: true
     },
     status: {
       type: String,
       enum: Object.values(PAYMENT_STATUS),
-      default: PAYMENT_STATUS.PENDING,
+      default: PAYMENT_STATUS.CREATED,
       index: true
     },
-    gatewayTransactionId: {
+    failureReason: {
       type: String,
-      trim: true,
-      sparse: true,
-      index: true
+      trim: true
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
+    },
+    paidAt: {
+      type: Date
     }
   },
   {
@@ -60,7 +87,13 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
-paymentSchema.index({ invoiceId: 1, status: 1 });
-paymentSchema.index({ customerId: 1, status: 1 });
+paymentSchema.pre('validate', function () {
+  if (!this.paymentReference) {
+    this.paymentReference = this.transactionId || this.gatewayOrderId || `PAY-${Date.now()}`;
+  }
+});
+
+paymentSchema.index({ bookingId: 1, status: 1 });
+paymentSchema.index({ customerId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

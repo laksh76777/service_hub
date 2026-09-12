@@ -14,6 +14,7 @@ import ProviderDashboardPage from './pages/ProviderDashboardPage';
 import ProviderProfilePage from './pages/ProviderProfilePage';
 import ProviderServicesPage from './pages/ProviderServicesPage';
 import BookingDetailPage from './pages/BookingDetailPage';
+import DemoCheckoutPage from './pages/DemoCheckoutPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
@@ -43,6 +44,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <BookingDetailPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="checkout/:bookingId"
+              element={
+                <ProtectedRoute>
+                  <DemoCheckoutPage />
                 </ProtectedRoute>
               }
             />

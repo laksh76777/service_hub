@@ -7,7 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test:auth": "node scripts/test-phase3-auth.js",
-    "test:marketplace": "node scripts/test-phase4-marketplace.js"
+    "test:marketplace": "node scripts/test-phase4-marketplace.js",
+    "test:bookings": "node scripts/test-phase5-bookings.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

@@ -8,13 +8,20 @@ import { useAuth } from '../context/AuthContext';
 import {
   getMyProviderProfile,
   adminGetProviders,
-  adminUpdateProviderStatus
+  adminUpdateProviderStatus,
+  getBookings,
+  updateBookingStatus
 } from '../services/api';
 
 const ProviderDashboardPage = () => {
   const { user, mongoUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Bookings state
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingNotice, setBookingNotice] = useState('');
 
   // Admin section state
   const isAdmin = mongoUser?.role === 'ADMIN';
@@ -37,6 +44,20 @@ const ProviderDashboardPage = () => {
     }
   };
 
+  const loadBookings = async () => {
+    setBookingsLoading(true);
+    try {
+      const res = await getBookings({ limit: 50 });
+      if (res?.data?.bookings) {
+        setBookings(res.data.bookings);
+      }
+    } catch (err) {
+      console.error('Failed to load provider bookings:', err);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
   const loadAdminProviders = async (status) => {
     setAdminLoading(true);
     try {
@@ -53,10 +74,22 @@ const ProviderDashboardPage = () => {
 
   useEffect(() => {
     loadProviderData();
+    loadBookings();
     if (isAdmin) {
       loadAdminProviders('PENDING');
     }
   }, [isAdmin]);
+
+  const handleQuickStatusTransition = async (bookingId, targetStatus, reason = '') => {
+    try {
+      setBookingNotice('');
+      const res = await updateBookingStatus(bookingId, { status: targetStatus, reason });
+      setBookingNotice(res.data.message || `Booking updated to ${targetStatus}`);
+      loadBookings();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to update booking status.');
+    }
+  };
 
   const handleAdminStatusUpdate = async (providerId, newStatus) => {
     setActionFeedback('');
@@ -98,23 +131,33 @@ const ProviderDashboardPage = () => {
       icon: '✕',
       title: 'Verification Needs Attention',
       message:
-        'Your verification was not approved. Please ensure your license number and trade credentials are up to date in your profile, then request a re-review.'
+        'Your verification was rejected or requires updated documentation. Please inspect your profile and upload valid licensing or insurance information.'
     },
     SUSPENDED: {
-      bg: 'bg-slate-100 border-slate-300 text-slate-800',
-      badge: 'bg-slate-200 text-slate-700 border-slate-300',
-      icon: '⚠️',
+      bg: 'bg-rose-50 border-rose-200 text-rose-900',
+      badge: 'bg-rose-100 text-rose-800 border-rose-300',
+      icon: '⚠',
       title: 'Account Suspended',
       message:
-        'Your provider account is currently suspended from customer dispatch. Please contact platform compliance.'
+        'Your provider privileges have been temporarily paused. Please contact administrator support to resolve pending compliance or dispute inquiries.'
     }
   }[status] || {
-    bg: 'bg-blue-50 border-blue-200 text-blue-900',
-    badge: 'bg-blue-100 text-blue-800',
-    icon: 'ℹ️',
-    title: 'Status',
-    message: status
+    bg: 'bg-slate-50 border-slate-200 text-slate-900',
+    badge: 'bg-slate-100 text-slate-800 border-slate-300',
+    icon: 'ℹ',
+    title: 'Status: ' + status,
+    message: 'Your provider profile status is currently ' + status
   };
+
+  const incomingRequests = bookings.filter((b) => b.status === 'REQUESTED');
+  const activeJobs = bookings.filter((b) =>
+    ['ACCEPTED', 'SCHEDULED', 'TECHNICIAN_ARRIVED', 'IN_PROGRESS', 'COMPLETION_PENDING'].includes(b.status)
+  );
+  const completedJobs = bookings.filter((b) =>
+    ['CUSTOMER_VERIFIED', 'COMPLETED', 'CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_PROVIDER', 'DISPUTED'].includes(
+      b.status
+    )
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -128,7 +171,7 @@ const ProviderDashboardPage = () => {
             {profile?.businessName || `${user?.displayName}'s Business`}
           </h1>
           <p className="text-slate-500 text-xs mt-1">
-            Manage your credentials, coverage areas, service offerings, and trade availability.
+            Manage your credentials, coverage areas, service offerings, and incoming customer booking requests.
           </p>
         </div>
 
@@ -145,6 +188,13 @@ const ProviderDashboardPage = () => {
           </Link>
         </div>
       </div>
+
+      {bookingNotice && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+          <span>✓ {bookingNotice}</span>
+          <button onClick={() => setBookingNotice('')} className="text-emerald-600 hover:text-emerald-900">×</button>
+        </div>
+      )}
 
       {/* Verification Status Banner */}
       <div className={`p-6 rounded-2xl border ${statusBannerConfig.bg} shadow-sm`}>
@@ -185,21 +235,15 @@ const ProviderDashboardPage = () => {
       {/* Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Account Status</span>
-          <div className="text-xl font-black text-slate-900 mt-1 uppercase">{status}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {status === 'VERIFIED' ? 'Publicly Discoverable' : 'Hidden from Search'}
-          </span>
+          <span className="text-xs uppercase font-semibold text-slate-400">Incoming Requests</span>
+          <div className="text-xl font-black text-amber-600 mt-1">{incomingRequests.length}</div>
+          <span className="text-[11px] text-slate-500 mt-0.5 block">Pending response</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Active Services</span>
-          <div className="text-xl font-black text-blue-600 mt-1">
-            {profile?.servicesOffered?.filter((s) => s.isActive).length || 0}
-          </div>
-          <Link to="/provider/services" className="text-[11px] text-blue-600 hover:underline font-semibold mt-0.5 block">
-            Configure catalog &rarr;
-          </Link>
+          <span className="text-xs uppercase font-semibold text-slate-400">Active Jobs</span>
+          <div className="text-xl font-black text-blue-600 mt-1">{activeJobs.length}</div>
+          <span className="text-[11px] text-slate-500 mt-0.5 block">Underway / Scheduled</span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -208,7 +252,7 @@ const ProviderDashboardPage = () => {
             ★ {profile?.rating?.average ? profile.rating.average.toFixed(1) : '5.0'}
           </div>
           <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {profile?.rating?.count || 0} customer reviews
+            {profile?.rating?.count || 0} reviews ({completedJobs.length} completed)
           </span>
         </div>
 
@@ -223,69 +267,139 @@ const ProviderDashboardPage = () => {
         </div>
       </div>
 
-      {/* Quick Configuration Links */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card
-          title="Profile & Coverage Settings"
-          subtitle="Keep your trade license, insurance, service radius, and working schedule updated."
-          footer={
-            <Link to="/provider/profile">
-              <Button size="sm" variant="outline">
-                Configure Profile &rarr;
-              </Button>
-            </Link>
-          }
-        >
-          <div className="space-y-2 text-xs text-slate-600">
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-500">License:</span>
-              <span className="font-semibold text-slate-800">{profile?.licenseNumber || 'Not provided'}</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-500">Insurance Provider:</span>
-              <span className="font-semibold text-slate-800">{profile?.insuranceDetails?.provider || 'None'}</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-500">Operating Radius:</span>
-              <span className="font-semibold text-slate-800">{profile?.serviceArea?.radiusKm || 25} km</span>
-            </div>
-            <div className="flex justify-between py-1">
-              <span className="text-slate-500">24/7 Emergency Dispatch:</span>
-              <span className={`font-semibold ${profile?.availability?.emergencyServices ? 'text-emerald-600' : 'text-slate-600'}`}>
-                {profile?.availability?.emergencyServices ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
+      {/* INCOMING SERVICE REQUESTS QUEUE */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Incoming Service Requests</h2>
+            <p className="text-xs text-slate-500">New job bookings submitted by customers awaiting your confirmation.</p>
           </div>
-        </Card>
+          <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
+            {incomingRequests.length} Pending
+          </span>
+        </div>
 
-        <Card
-          title="Service Catalog & Custom Pricing"
-          subtitle="Publish specific trade services with customized descriptions and upfront rates."
-          footer={
-            <Link to="/provider/services">
-              <Button size="sm" variant="primary">
-                Manage Services &rarr;
-              </Button>
-            </Link>
-          }
-        >
-          <div className="space-y-2 text-xs">
-            {profile?.servicesOffered?.length === 0 ? (
-              <p className="text-slate-500 text-xs py-4 text-center">
-                You have not added any services yet. Click below to choose from platform offerings.
-              </p>
-            ) : (
-              profile?.servicesOffered?.slice(0, 3).map((s) => (
-                <div key={s._id} className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                  <span className="font-medium text-slate-800">{s.customTitle || s.serviceId?.name}</span>
-                  <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded text-[11px]">
-                    ${s.pricing?.amount} ({s.pricing?.type?.replace('_', ' ')})
-                  </span>
-                </div>
-              ))
-            )}
+        {bookingsLoading ? (
+          <Loading text="Loading incoming bookings..." />
+        ) : incomingRequests.length === 0 ? (
+          <div className="p-8 text-center bg-white border border-slate-200 rounded-2xl">
+            <p className="text-sm font-semibold text-slate-700">No new incoming requests</p>
+            <p className="text-xs text-slate-400 mt-1">When customers in your service area request an appointment, they will show up here.</p>
           </div>
-        </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {incomingRequests.map((b) => (
+              <Card
+                key={b._id}
+                title={<span>{b.serviceId?.name || 'Service Job'}</span>}
+                subtitle={`Ref: ${b.bookingNumber} • Scheduled: ${new Date(b.scheduledDate).toLocaleDateString()} (${b.preferredTimeSlot})`}
+                footer={
+                  <div className="flex items-center justify-between w-full pt-1">
+                    <Link to={`/bookings/${b._id}`}>
+                      <Button size="sm" variant="outline">
+                        View Details & Timeline &rarr;
+                      </Button>
+                    </Link>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        onClick={() => {
+                          const r = prompt('Reason for declining request:');
+                          if (r) handleQuickStatusTransition(b._id, 'CANCELLED_BY_PROVIDER', r);
+                        }}
+                      >
+                        Decline
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => handleQuickStatusTransition(b._id, 'ACCEPTED', 'Provider accepted booking')}
+                      >
+                        Accept Request
+                      </Button>
+                    </div>
+                  </div>
+                }
+              >
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Customer:</span>
+                    <span className="font-bold text-slate-800">{b.customerId?.name}</span>
+                    <span className="text-slate-500 block">{b.customerId?.phone} • {b.customerId?.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Job Location:</span>
+                    <span className="text-slate-700">{b.address?.streetAddress}, {b.address?.city} {b.address?.zipCode}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Problem Scope:</span>
+                    <p className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700 italic">
+                      "{b.problemDescription}"
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ACTIVE JOBS & SCHEDULED APPOINTMENTS */}
+      <div className="space-y-4 pt-4 border-t border-slate-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Active Job Pipeline</h2>
+            <p className="text-xs text-slate-500">Confirmed, scheduled, and ongoing jobs governed by the state machine.</p>
+          </div>
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
+            {activeJobs.length} Active
+          </span>
+        </div>
+
+        {activeJobs.length === 0 ? (
+          <div className="p-6 text-center bg-white border border-slate-200 rounded-2xl text-xs text-slate-400">
+            No active jobs currently in progress.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {activeJobs.map((b) => (
+              <Card
+                key={b._id}
+                title={<span>{b.serviceId?.name}</span>}
+                subtitle={`Ref: ${b.bookingNumber} • ${new Date(b.scheduledDate).toLocaleDateString()}`}
+                footer={
+                  <div className="flex items-center justify-between w-full pt-1">
+                    <span className="text-[11px] font-bold text-slate-500">${b.pricing?.estimatedTotal || 0}</span>
+                    <Link to={`/bookings/${b._id}`}>
+                      <Button size="sm" variant="primary">
+                        Manage Job &rarr;
+                      </Button>
+                    </Link>
+                  </div>
+                }
+              >
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 font-semibold">Stage:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-100 text-blue-800">
+                      {b.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Customer:</span>
+                    <span className="font-medium text-slate-800">{b.customerId?.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-semibold block">Address:</span>
+                    <span className="text-slate-600">{b.address?.streetAddress}, {b.address?.city}</span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ADMIN VERIFICATION SECTION (Displayed only if logged in user is ADMIN) */}
@@ -330,7 +444,7 @@ const ProviderDashboardPage = () => {
           )}
 
           {adminLoading ? (
-            <Loading fullPage text="Retrieving moderation queue..." />
+            <Loading text="Retrieving moderation queue..." />
           ) : adminProviders.length === 0 ? (
             <EmptyState
               title={`No ${adminFilter} providers in queue`}

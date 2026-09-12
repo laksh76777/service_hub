@@ -6,6 +6,7 @@ const categoryRoutes = require('./categoryRoutes');
 const serviceRoutes = require('./serviceRoutes');
 const { publicRouter: providerPublicRoutes, portalRouter: providerPortalRoutes } = require('./providerRoutes');
 const adminRoutes = require('./adminRoutes');
+const bookingRoutes = require('./bookingRoutes');
 
 const router = express.Router();
 
@@ -17,5 +18,6 @@ router.use('/services', serviceRoutes);
 router.use('/providers', providerPublicRoutes);
 router.use('/provider', providerPortalRoutes);
 router.use('/admin', adminRoutes);
+router.use('/bookings', bookingRoutes);
 
 module.exports = router;

@@ -1,39 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import EmptyState from '../components/common/EmptyState';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
-import { updateMe } from '../services/api';
-
-const mockBookings = [
-  {
-    id: 'BK-1041',
-    service: 'Plumbing Repair & Installation',
-    provider: 'Precision Pipe & Drain Works',
-    status: 'Estimate Pending',
-    statusColor: 'bg-amber-100 text-amber-800',
-    date: '2026-09-15',
-    estimateTotal: '$180.00'
-  },
-  {
-    id: 'BK-1039',
-    service: 'Electrical Panel Rewiring',
-    provider: 'Apex Heating & Cooling',
-    status: 'Work In Progress',
-    statusColor: 'bg-blue-100 text-blue-800',
-    date: '2026-09-10',
-    estimateTotal: '$320.00'
-  }
-];
+import { updateMe, getBookings } from '../services/api';
 
 const DashboardPage = () => {
   const { user, mongoUser, isEmailVerified, resendVerificationEmail, refreshUserProfile } = useAuth();
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [bookings] = useState(mockBookings);
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
   const [inspectBooking, setInspectBooking] = useState(null);
+
+  const loadCustomerBookings = async () => {
+    setBookingsLoading(true);
+    try {
+      const res = await getBookings({ limit: 50 });
+      if (res?.data?.bookings) {
+        setBookings(res.data.bookings);
+      }
+    } catch (err) {
+      console.error('Failed to load user bookings:', err);
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadCustomerBookings();
+    }
+  }, [user]);
 
   // Email verification state
   const [verifyNotice, setVerifyNotice] = useState('');
@@ -265,40 +266,65 @@ const DashboardPage = () => {
       {/* Bookings Tab */}
       {activeTab === 'bookings' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {bookings.map((b) => (
-              <Card
-                key={b.id}
-                title={<span>{b.service}</span>}
-                subtitle={`Reference ID: ${b.id}`}
-                footer={
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">Scheduled: {b.date}</span>
-                    <Button size="sm" variant="outline" onClick={() => setInspectBooking(b)}>
-                      View Timeline
-                    </Button>
-                  </div>
-                }
-              >
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Assigned Provider:</span>
-                    <span className="font-medium text-slate-800">{b.provider}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Estimate Total:</span>
-                    <span className="font-semibold text-slate-900">{b.estimateTotal}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="text-slate-500">Status:</span>
-                    <span className={`px-2.5 py-0.5 rounded text-xs font-semibold ${b.statusColor}`}>
-                      {b.status}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">My Service Bookings</h2>
+              <p className="text-xs text-slate-500">Track and manage your requests from initial quote to job verification.</p>
+            </div>
+            <Link to="/services">
+              <Button size="sm" variant="primary">
+                + Request New Service
+              </Button>
+            </Link>
           </div>
+
+          {bookingsLoading ? (
+            <div className="py-12 text-center text-slate-400 text-xs font-semibold">Loading bookings...</div>
+          ) : bookings.length === 0 ? (
+            <EmptyState
+              title="No service bookings found"
+              description="You have not requested any trade services yet. Browse our marketplace catalog to find verified contractors."
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {bookings.map((b) => (
+                <Card
+                  key={b._id}
+                  title={<span>{b.serviceId?.name || 'Trade Service'}</span>}
+                  subtitle={`Order #${b.bookingNumber}`}
+                  footer={
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-xs text-slate-500">
+                        Date: {new Date(b.scheduledDate).toLocaleDateString()}
+                      </span>
+                      <Link to={`/bookings/${b._id}`}>
+                        <Button size="sm" variant="outline">
+                          View Details & Timeline &rarr;
+                        </Button>
+                      </Link>
+                    </div>
+                  }
+                >
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Contractor:</span>
+                      <span className="font-bold text-slate-800">{b.providerId?.name || 'Verified Pro'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Address:</span>
+                      <span className="text-slate-700">{b.address?.streetAddress}, {b.address?.city}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-slate-100">
+                      <span className="text-slate-500">Status:</span>
+                      <span className="px-2.5 py-0.5 rounded text-[11px] font-black uppercase bg-blue-100 text-blue-800">
+                        {b.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

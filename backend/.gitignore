@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Service account keys, credentials, and certificates
+*serviceAccount*.json
+*service-account*.json
+*credentials*.json
+*secret*.json
+*.pem
+*.key
+*.cert
+*.crt
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/

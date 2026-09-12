@@ -1,14 +1,14 @@
 const USER_ROLES = Object.freeze({
-  CUSTOMER: 'customer',
-  PROVIDER: 'provider',
-  ADMIN: 'admin'
+  CUSTOMER: 'CUSTOMER',
+  PROVIDER: 'PROVIDER',
+  ADMIN: 'ADMIN'
 });
 
 const USER_STATUS = Object.freeze({
-  ACTIVE: 'active',
-  SUSPENDED: 'suspended',
-  PENDING_VERIFICATION: 'pending_verification',
-  DEACTIVATED: 'deactivated'
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  DEACTIVATED: 'DEACTIVATED'
 });
 
 const PROVIDER_STATUS = Object.freeze({

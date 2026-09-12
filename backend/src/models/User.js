@@ -3,6 +3,18 @@ const { USER_ROLES, USER_STATUS } = require('../utils/constants');
 
 const userSchema = new mongoose.Schema(
   {
+    firebaseUid: {
+      type: String,
+      required: [true, 'Firebase UID is required'],
+      unique: true,
+      trim: true,
+      index: true
+    },
+    name: {
+      type: String,
+      required: [true, 'Name is required'],
+      trim: true
+    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -15,17 +27,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       sparse: true,
-      index: true
-    },
-    firstName: {
-      type: String,
-      required: [true, 'First name is required'],
-      trim: true
-    },
-    lastName: {
-      type: String,
-      required: [true, 'Last name is required'],
-      trim: true
+      default: null
     },
     role: {
       type: String,
@@ -36,7 +38,7 @@ const userSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: Object.values(USER_STATUS),
-      default: USER_STATUS.PENDING_VERIFICATION,
+      default: USER_STATUS.ACTIVE,
       index: true
     },
     avatarUrl: {
@@ -50,4 +52,18 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Virtual for id if needed
+userSchema.virtual('id').get(function () {
+  return this._id.toHexString();
+});
+
+userSchema.set('toJSON', {
+  virtuals: true,
+  transform: (doc, ret) => {
+    delete ret.__v;
+    return ret;
+  }
+});
+
 module.exports = mongoose.model('User', userSchema);
+

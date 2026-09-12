@@ -4,6 +4,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Loading from '../components/common/Loading';
 import EmptyState from '../components/common/EmptyState';
+import BookingModal from '../components/booking/BookingModal';
 import { getServiceById } from '../services/api';
 
 const ServiceDetailPage = () => {
@@ -12,6 +13,10 @@ const ServiceDetailPage = () => {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Booking modal state
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [targetProvider, setTargetProvider] = useState(null);
 
   useEffect(() => {
     const fetchDetails = async () => {
@@ -73,13 +78,26 @@ const ServiceDetailPage = () => {
             <p className="text-slate-300 text-sm leading-relaxed">{service.description}</p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/15 min-w-[240px] text-center md:text-right">
-            <span className="text-xs uppercase tracking-wider text-slate-300 font-medium block">Standard Estimate</span>
-            <div className="text-2xl font-black text-white mt-1">
-              ${service.estimatedPriceRange?.min} - ${service.estimatedPriceRange?.max}{' '}
-              <span className="text-xs font-normal text-slate-300">{service.estimatedPriceRange?.currency}</span>
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/15 min-w-[240px] text-center md:text-right space-y-3">
+            <div>
+              <span className="text-xs uppercase tracking-wider text-slate-300 font-medium block">Standard Estimate</span>
+              <div className="text-2xl font-black text-white mt-1">
+                ${service.estimatedPriceRange?.min} - ${service.estimatedPriceRange?.max}{' '}
+                <span className="text-xs font-normal text-slate-300">{service.estimatedPriceRange?.currency}</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Estimates include standard 30-day workmanship warranty.</p>
             </div>
-            <p className="text-[11px] text-slate-400 mt-1">Estimates include standard 30-day workmanship warranty.</p>
+            <Button
+              size="sm"
+              variant="primary"
+              className="w-full bg-blue-500 hover:bg-blue-400 text-white font-bold"
+              onClick={() => {
+                setTargetProvider(providers[0] || null);
+                setIsBookingOpen(true);
+              }}
+            >
+              Request Service Appointment
+            </Button>
           </div>
         </div>
       </div>
@@ -131,15 +149,27 @@ const ServiceDetailPage = () => {
                   </span>
                 }
                 footer={
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center justify-between pt-1 gap-2">
                     <span className="text-xs text-slate-500 font-medium">
-                      Coverage: {p.serviceArea?.cities?.slice(0, 3).join(', ') || 'Metro Area'}
+                      Coverage: {p.serviceArea?.cities?.slice(0, 2).join(', ') || 'Metro Area'}
                     </span>
-                    <Link to={`/providers/${p.id}`}>
-                      <Button size="sm" variant="primary">
-                        View Profile & Rates
+                    <div className="flex gap-2">
+                      <Link to={`/providers/${p.id}`}>
+                        <Button size="sm" variant="outline">
+                          Profile
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          setTargetProvider(p);
+                          setIsBookingOpen(true);
+                        }}
+                      >
+                        Book Pro
                       </Button>
-                    </Link>
+                    </div>
                   </div>
                 }
               >
@@ -176,6 +206,14 @@ const ServiceDetailPage = () => {
           </div>
         )}
       </div>
+
+      {/* Customer Booking Flow Modal */}
+      <BookingModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        initialService={service}
+        initialProvider={targetProvider}
+      />
     </div>
   );
 };

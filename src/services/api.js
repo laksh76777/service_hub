@@ -72,4 +72,12 @@ export const adminUpdateProviderStatus = (id, data) => api.patch(`/admin/provide
 export const adminCreateCategory = (data) => api.post('/categories', data);
 export const adminCreateService = (data) => api.post('/services', data);
 
+// Booking APIs
+export const createBooking = (data) => api.post('/bookings', data);
+export const getBookings = (params = {}) => api.get('/bookings', { params });
+export const getBookingById = (id) => api.get(`/bookings/${id}`);
+export const updateBookingStatus = (id, data) => api.patch(`/bookings/${id}/status`, data);
+export const rescheduleBooking = (id, data) => api.patch(`/bookings/${id}/reschedule`, data);
+
 export default api;
+

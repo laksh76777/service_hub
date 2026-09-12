@@ -4,6 +4,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Loading from '../components/common/Loading';
 import EmptyState from '../components/common/EmptyState';
+import BookingModal from '../components/booking/BookingModal';
 import { getProviderById } from '../services/api';
 
 const ProviderDetailPage = () => {
@@ -11,6 +12,10 @@ const ProviderDetailPage = () => {
   const [provider, setProvider] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Booking modal state
+  const [isBookingOpen, setIsBookingOpen] = useState(false);
+  const [targetService, setTargetService] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -81,26 +86,40 @@ const ProviderDetailPage = () => {
             </p>
           </div>
 
-          {/* Quick Metrics */}
-          <div className="flex sm:flex-row lg:flex-col gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200 min-w-[220px]">
-            <div>
-              <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">
-                Customer Rating
-              </span>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">
-                ★ {provider.rating?.average ? provider.rating.average.toFixed(1) : '5.0'}
-                <span className="text-xs font-normal text-slate-500 ml-1">({provider.rating?.count || 0} reviews)</span>
+          {/* Quick Metrics & Actions */}
+          <div className="flex flex-col gap-4 bg-slate-50 p-5 rounded-2xl border border-slate-200 min-w-[220px]">
+            <div className="flex sm:flex-row lg:flex-col gap-4">
+              <div>
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">
+                  Customer Rating
+                </span>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  ★ {provider.rating?.average ? provider.rating.average.toFixed(1) : '5.0'}
+                  <span className="text-xs font-normal text-slate-500 ml-1">({provider.rating?.count || 0} reviews)</span>
+                </div>
+              </div>
+
+              <div className="pt-2 sm:pt-0 lg:pt-2 sm:border-l lg:border-l-0 lg:border-t border-slate-200 pl-4 sm:pl-4 lg:pl-0">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">
+                  Verified Jobs
+                </span>
+                <div className="text-2xl font-black text-slate-900 mt-0.5">
+                  {provider.completedJobsCount || 0}
+                </div>
               </div>
             </div>
 
-            <div className="pt-2 sm:pt-0 lg:pt-2 sm:border-l lg:border-l-0 lg:border-t border-slate-200 pl-4 sm:pl-4 lg:pl-0">
-              <span className="text-[11px] uppercase tracking-wider font-semibold text-slate-400 block">
-                Verified Jobs
-              </span>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">
-                {provider.completedJobsCount || 0}
-              </div>
-            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              className="w-full font-bold"
+              onClick={() => {
+                setTargetService(provider.services?.[0]?.serviceId || null);
+                setIsBookingOpen(true);
+              }}
+            >
+              Book Service With Pro
+            </Button>
           </div>
         </div>
       </div>
@@ -156,15 +175,27 @@ const ProviderDetailPage = () => {
                     {offering.description || offering.serviceId?.description}
                   </p>
 
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
                     <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
                       <span>🛡️</span> Covered by ServiceHub 60-day warranty
                     </span>
-                    <Link to={`/services/${offering.serviceId?._id || ''}`}>
-                      <Button size="sm" variant="outline">
-                        Compare Standard Scope
+                    <div className="flex gap-2">
+                      <Link to={`/services/${offering.serviceId?._id || ''}`}>
+                        <Button size="sm" variant="outline">
+                          Compare
+                        </Button>
+                      </Link>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          setTargetService(offering.serviceId || null);
+                          setIsBookingOpen(true);
+                        }}
+                      >
+                        Book Service
                       </Button>
-                    </Link>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -271,6 +302,14 @@ const ProviderDetailPage = () => {
           </Card>
         </div>
       </div>
+
+      {/* Customer Booking Flow Modal */}
+      <BookingModal
+        isOpen={isBookingOpen}
+        onClose={() => setIsBookingOpen(false)}
+        initialService={targetService}
+        initialProvider={provider}
+      />
     </div>
   );
 };

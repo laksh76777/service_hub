@@ -78,7 +78,7 @@ const ServicesPage = () => {
         </div>
         <div className="w-full md:w-80">
           <Input
-            placeholder="Search services, e.g. panel upgrade, leak..."
+            placeholder="Search services, e.g. AC service, switchboard, tap leak..."
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value, selectedCategory)}
           />
@@ -181,8 +181,8 @@ const ServicesPage = () => {
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">Estimate Range:</span>
                   <span className="font-bold text-slate-900">
-                    ${service.estimatedPriceRange?.min || 50} - ${service.estimatedPriceRange?.max || 200}{' '}
-                    {service.estimatedPriceRange?.currency || 'USD'}
+                    ₹{service.estimatedPriceRange?.min || 199} - ₹{service.estimatedPriceRange?.max || 999}{' '}
+                    {service.estimatedPriceRange?.currency || 'INR'}
                   </span>
                 </div>
               </div>

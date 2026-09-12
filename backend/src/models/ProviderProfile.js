@@ -46,6 +46,7 @@ const providerProfileSchema = new mongoose.Schema(
     },
     serviceArea: {
       cities: [{ type: String, trim: true }],
+      pincodes: [{ type: String, trim: true }],
       zipCodes: [{ type: String, trim: true }],
       radiusKm: { type: Number, default: 25 }
     },
@@ -97,7 +98,7 @@ const providerProfileSchema = new mongoose.Schema(
           },
           currency: {
             type: String,
-            default: 'USD'
+            default: 'INR'
           }
         },
         isActive: {
@@ -121,7 +122,19 @@ const providerProfileSchema = new mongoose.Schema(
   }
 );
 
+// Backward-compatible synchronization of pincodes and zipCodes
+providerProfileSchema.pre('save', function () {
+  if (this.serviceArea) {
+    if (Array.isArray(this.serviceArea.pincodes) && this.serviceArea.pincodes.length > 0) {
+      this.serviceArea.zipCodes = [...new Set([...this.serviceArea.pincodes])];
+    } else if (Array.isArray(this.serviceArea.zipCodes) && this.serviceArea.zipCodes.length > 0) {
+      this.serviceArea.pincodes = [...new Set([...this.serviceArea.zipCodes])];
+    }
+  }
+});
+
 providerProfileSchema.index({ status: 1, 'rating.average': -1 });
+providerProfileSchema.index({ status: 1, 'serviceArea.pincodes': 1 });
 providerProfileSchema.index({ status: 1, 'serviceArea.zipCodes': 1 });
 providerProfileSchema.index({ status: 1, 'serviceArea.cities': 1 });
 providerProfileSchema.index({ status: 1, 'servicesOffered.serviceId': 1 });

@@ -38,12 +38,36 @@ const createBooking = async (req, res) => {
       });
     }
 
-    if (!address.streetAddress || !address.city || !address.state || !address.zipCode) {
+    const line1 = (address.addressLine1 || address.streetAddress || '').trim();
+    const pin = (address.pincode || address.zipCode || '').trim();
+
+    if (!line1 || !address.city || !address.state || !pin) {
       return res.status(400).json({
         success: false,
-        message: 'Complete address details (streetAddress, city, state, zipCode) are required.'
+        message: 'Complete address details (addressLine1/streetAddress, city, state, pincode/zipCode) are required.'
       });
     }
+
+    const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
+    if (!PINCODE_REGEX.test(pin)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 6-digit Indian PIN code (e.g. 560001).'
+      });
+    }
+
+    const normalizedAddress = {
+      addressLine1: line1,
+      streetAddress: line1,
+      addressLine2: (address.addressLine2 || address.unit || '').trim(),
+      unit: (address.unit || address.addressLine2 || '').trim(),
+      locality: (address.locality || '').trim(),
+      landmark: (address.landmark || '').trim(),
+      city: address.city.trim(),
+      state: address.state.trim(),
+      pincode: pin,
+      zipCode: pin
+    };
 
     // Verify service exists
     const service = await Service.findById(serviceId);
@@ -73,12 +97,12 @@ const createBooking = async (req, res) => {
     }
 
     // Calculate baseline estimated price if available
-    let estimatedTotal = service.basePrice || 0;
+    let estimatedTotal = service.basePrice || service.estimatedPriceRange?.min || 0;
     const matchedOffering = providerProfile.servicesOffered?.find(
       (s) => s.serviceId.toString() === serviceId.toString() && s.isActive
     );
-    if (matchedOffering?.price) {
-      estimatedTotal = matchedOffering.price;
+    if (matchedOffering?.pricing?.amount) {
+      estimatedTotal = matchedOffering.pricing.amount;
     }
 
     const bookingNumber = generateBookingNumber();
@@ -102,7 +126,7 @@ const createBooking = async (req, res) => {
       customerId: req.user._id,
       providerId,
       serviceId,
-      address,
+      address: normalizedAddress,
       scheduledDate: new Date(scheduledDate),
       preferredTimeSlot: preferredTimeSlot || 'Morning (09:00 - 12:00)',
       problemDescription: problemDescription.trim(),
@@ -110,7 +134,7 @@ const createBooking = async (req, res) => {
       pricing: {
         estimatedTotal,
         finalTotal: 0,
-        currency: 'USD'
+        currency: 'INR'
       },
       statusHistory: initialStatusHistory,
       rescheduleHistory: []

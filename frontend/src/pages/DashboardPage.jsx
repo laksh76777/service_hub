@@ -233,7 +233,7 @@ const DashboardPage = () => {
 
                 <Input
                   label="Phone Number"
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+91 98765 43210"
                   value={editPhone}
                   onChange={(e) => setEditPhone(e.target.value)}
                 />
@@ -295,7 +295,7 @@ const DashboardPage = () => {
                   footer={
                     <div className="flex items-center justify-between w-full">
                       <span className="text-xs text-slate-500">
-                        Date: {new Date(b.scheduledDate).toLocaleDateString()}
+                        Date: {new Date(b.scheduledDate).toLocaleDateString('en-IN')}
                       </span>
                       <Link to={`/bookings/${b._id}`}>
                         <Button size="sm" variant="outline">
@@ -312,7 +312,10 @@ const DashboardPage = () => {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Address:</span>
-                      <span className="text-slate-700">{b.address?.streetAddress}, {b.address?.city}</span>
+                      <span className="text-slate-700">
+                        {b.address?.addressLine1 || b.address?.streetAddress}
+                        {b.address?.locality ? `, ${b.address.locality}` : ''}, {b.address?.city}
+                      </span>
                     </div>
                     <div className="flex justify-between items-center pt-1 border-t border-slate-100">
                       <span className="text-slate-500">Status:</span>
@@ -335,8 +338,8 @@ const DashboardPage = () => {
             Authorized for: <span className="font-semibold text-slate-800">{mongoUser?.role}</span> accounts.
           </p>
           <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm">
-            <div className="font-semibold text-slate-800">Job BK-1041: Plumbing Repair Estimate</div>
-            <div className="text-slate-600 text-xs mt-1">Labor: $120 | Parts (Copper valve & fittings): $60 | Total: $180.00</div>
+            <div className="font-semibold text-slate-800">Job BK-1041: AC Jet Servicing & Cooling Repair</div>
+            <div className="text-slate-600 text-xs mt-1">Labor: ₹499 | Parts (Capacitor & Freon Gas): ₹1,200 | Total: ₹1,699.00</div>
           </div>
         </Card>
       )}

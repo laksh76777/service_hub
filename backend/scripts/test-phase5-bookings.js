@@ -65,9 +65,10 @@ async function runBookingTests() {
     const customerUser = await User.findOneAndUpdate(
       { email: 'customer.booking.test@example.com' },
       {
-        name: 'Alice Customer',
+        name: 'Ananya Roy',
         firebaseUid: 'cust-booking-test-uid',
         email: 'customer.booking.test@example.com',
+        phone: '+91 98765 11223',
         role: USER_ROLES.CUSTOMER,
         status: 'ACTIVE'
       },
@@ -77,9 +78,10 @@ async function runBookingTests() {
     const providerUser = await User.findOneAndUpdate(
       { email: 'provider.booking.test@example.com' },
       {
-        name: 'Bob Master Plumber',
+        name: 'Sunil Verma',
         firebaseUid: 'prov-booking-test-uid',
         email: 'provider.booking.test@example.com',
+        phone: '+91 98765 33445',
         role: USER_ROLES.PROVIDER,
         status: 'ACTIVE'
       },
@@ -115,19 +117,20 @@ async function runBookingTests() {
     if (!providerProfile) {
       providerProfile = await ProviderProfile.create({
         userId: providerUser._id,
-        businessName: 'Bob Pipe & Drain Co',
+        businessName: 'Verma Plumbing & Sanitary Care',
         status: PROVIDER_STATUS.VERIFIED,
-        licenseNumber: 'PLUMB-9992',
+        licenseNumber: 'GSTIN-29AABCU-9992',
         serviceArea: {
-          cities: ['San Francisco', 'Oakland'],
-          zipCodes: ['94103', '94107'],
-          radiusKm: 30
+          cities: ['Bengaluru', 'Indiranagar', 'Koramangala'],
+          pincodes: ['560038', '560001'],
+          zipCodes: ['560038', '560001'],
+          radiusKm: 25
         },
         availability: {
-          days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY'],
-          workingHours: { start: '08:00', end: '18:00' },
+          days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+          workingHours: { start: '08:00', end: '20:00' },
           emergencyServices: true,
-          noticeHours: 12
+          noticeHours: 6
         }
       });
     } else {
@@ -154,15 +157,17 @@ async function runBookingTests() {
       serviceId: testService._id,
       providerId: providerUser._id,
       address: {
-        streetAddress: '789 Mission Street',
-        unit: 'Apt 12B',
-        city: 'San Francisco',
-        state: 'CA',
-        zipCode: '94103'
+        addressLine1: 'Flat 402, Royal Palms, 1st Cross',
+        addressLine2: 'Indiranagar 100 Feet Road',
+        locality: 'Indiranagar',
+        landmark: 'Near 100 Feet Road Metro Station',
+        city: 'Bengaluru',
+        state: 'Karnataka',
+        pincode: '560038'
       },
       scheduledDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
       preferredTimeSlot: 'Morning (09:00 - 12:00)',
-      problemDescription: 'Severe kitchen sink drainage backup with gurgling pipes.'
+      problemDescription: 'Kitchen sink water drainage pipe blockage and tap leak.'
     };
 
     const t1 = createMockReqRes(customerUser, createPayload);

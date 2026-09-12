@@ -164,10 +164,10 @@ const runTests = async () => {
     const updateRes = await makeApiRequest(testPort, '/api/users/me', 'PATCH', {
       Authorization: `Bearer ${idToken}`
     }, {
-      name: 'Automated Verified Tester',
-      phone: '+1-800-555-0199'
+      name: 'Rohan Sharma',
+      phone: '+91-98765-01234'
     });
-    if (updateRes.status !== 200 || updateRes.data?.data?.user?.name !== 'Automated Verified Tester') {
+    if (updateRes.status !== 200 || updateRes.data?.data?.user?.name !== 'Rohan Sharma') {
       throw new Error(`Failed PATCH /api/users/me: ${JSON.stringify(updateRes.data)}`);
     }
     console.log(`✓ User profile updated: Name=${updateRes.data.data.user.name}, Phone=${updateRes.data.data.user.phone}`);

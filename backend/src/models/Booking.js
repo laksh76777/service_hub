@@ -103,12 +103,27 @@ const bookingSchema = new mongoose.Schema(
       ref: 'ServiceRequest'
     },
     address: {
+      addressLine1: {
+        type: String,
+        trim: true
+      },
       streetAddress: {
         type: String,
-        required: [true, 'Street address is required'],
+        trim: true
+      },
+      addressLine2: {
+        type: String,
         trim: true
       },
       unit: {
+        type: String,
+        trim: true
+      },
+      locality: {
+        type: String,
+        trim: true
+      },
+      landmark: {
         type: String,
         trim: true
       },
@@ -122,9 +137,12 @@ const bookingSchema = new mongoose.Schema(
         required: [true, 'State is required'],
         trim: true
       },
+      pincode: {
+        type: String,
+        trim: true
+      },
       zipCode: {
         type: String,
-        required: [true, 'Zip code is required'],
         trim: true
       }
     },
@@ -152,7 +170,7 @@ const bookingSchema = new mongoose.Schema(
     pricing: {
       estimatedTotal: { type: Number, default: 0 },
       finalTotal: { type: Number, default: 0 },
-      currency: { type: String, default: 'USD' }
+      currency: { type: String, default: 'INR' }
     },
     statusHistory: [statusHistorySchema],
     rescheduleHistory: [rescheduleSchema]
@@ -162,6 +180,36 @@ const bookingSchema = new mongoose.Schema(
     collection: 'bookings'
   }
 );
+
+// Backward-compatible address synchronization
+bookingSchema.pre('validate', function () {
+  if (this.address) {
+    if (this.address.addressLine1 && !this.address.streetAddress) {
+      this.address.streetAddress = this.address.addressLine1;
+    } else if (this.address.streetAddress && !this.address.addressLine1) {
+      this.address.addressLine1 = this.address.streetAddress;
+    }
+
+    if (this.address.addressLine2 && !this.address.unit) {
+      this.address.unit = this.address.addressLine2;
+    } else if (this.address.unit && !this.address.addressLine2) {
+      this.address.addressLine2 = this.address.unit;
+    }
+
+    if (this.address.pincode && !this.address.zipCode) {
+      this.address.zipCode = this.address.pincode;
+    } else if (this.address.zipCode && !this.address.pincode) {
+      this.address.pincode = this.address.zipCode;
+    }
+
+    if (!this.address.streetAddress && this.address.addressLine1) {
+      this.address.streetAddress = this.address.addressLine1;
+    }
+    if (!this.address.zipCode && this.address.pincode) {
+      this.address.zipCode = this.address.pincode;
+    }
+  }
+});
 
 bookingSchema.index({ customerId: 1, status: 1 });
 bookingSchema.index({ providerId: 1, status: 1 });

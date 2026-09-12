@@ -166,7 +166,7 @@ const ProviderDetailPage = () => {
                         {offering.pricing?.type?.replace('_', ' ')}
                       </span>
                       <span className="text-xl font-black text-slate-900">
-                        ${offering.pricing?.amount} {offering.pricing?.currency}
+                        ₹{offering.pricing?.amount} {offering.pricing?.currency || 'INR'}
                       </span>
                     </div>
                   </div>
@@ -224,12 +224,12 @@ const ProviderDetailPage = () => {
               </div>
 
               <div className="pt-2 border-t border-slate-100">
-                <span className="text-slate-400 font-semibold uppercase block mb-1">Zip Codes Serviced</span>
+                <span className="text-slate-400 font-semibold uppercase block mb-1">PIN Codes Serviced</span>
                 <div className="flex flex-wrap gap-1">
-                  {provider.serviceArea?.zipCodes?.length ? (
-                    provider.serviceArea.zipCodes.map((zip) => (
-                      <span key={zip} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[11px]">
-                        {zip}
+                  {(provider.serviceArea?.pincodes?.length ? provider.serviceArea.pincodes : (provider.serviceArea?.zipCodes || [])).length > 0 ? (
+                    (provider.serviceArea?.pincodes?.length ? provider.serviceArea.pincodes : (provider.serviceArea?.zipCodes || [])).map((pin) => (
+                      <span key={pin} className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-[11px]">
+                        {pin}
                       </span>
                     ))
                   ) : (

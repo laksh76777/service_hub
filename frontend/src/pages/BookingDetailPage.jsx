@@ -199,7 +199,7 @@ const BookingDetailPage = () => {
             {booking.serviceId?.name || 'Service Appointment'}
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Order Reference: <span className="font-mono font-bold text-slate-700">{booking.bookingNumber}</span> | Created on {new Date(booking.createdAt).toLocaleDateString()}
+            Order Reference: <span className="font-mono font-bold text-slate-700">{booking.bookingNumber}</span> | Created on {new Date(booking.createdAt).toLocaleDateString('en-IN')}
           </p>
         </div>
 
@@ -388,7 +388,12 @@ const BookingDetailPage = () => {
                 <div>
                   <span className="text-slate-400 font-bold uppercase block">Scheduled Date</span>
                   <span className="text-sm font-bold text-slate-800">
-                    {new Date(booking.scheduledDate).toDateString()}
+                    {new Date(booking.scheduledDate).toLocaleDateString('en-IN', {
+                      weekday: 'short',
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
                   </span>
                 </div>
                 <div>
@@ -402,10 +407,17 @@ const BookingDetailPage = () => {
               <div className="pt-2 border-t border-slate-100">
                 <span className="text-slate-400 font-bold uppercase block mb-1">Job Site Address</span>
                 <p className="text-sm font-semibold text-slate-800">
-                  {booking.address?.streetAddress} {booking.address?.unit ? `Apt ${booking.address.unit}` : ''}
+                  {booking.address?.addressLine1 || booking.address?.streetAddress}
+                  {booking.address?.addressLine2 || booking.address?.unit ? `, ${booking.address.addressLine2 || booking.address.unit}` : ''}
                 </p>
+                {booking.address?.locality && (
+                  <p className="text-slate-600 font-medium">Area / Locality: {booking.address.locality}</p>
+                )}
+                {booking.address?.landmark && (
+                  <p className="text-slate-500 text-xs">Landmark: {booking.address.landmark}</p>
+                )}
                 <p className="text-slate-600">
-                  {booking.address?.city}, {booking.address?.state} {booking.address?.zipCode}
+                  {booking.address?.city}, {booking.address?.state} - {booking.address?.pincode || booking.address?.zipCode}
                 </p>
               </div>
             </div>
@@ -418,10 +430,10 @@ const BookingDetailPage = () => {
                 {booking.rescheduleHistory.map((r, idx) => (
                   <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg">
                     <span className="font-bold text-slate-800">
-                      Rescheduled to {new Date(r.newDate).toDateString()} ({r.newTimeSlot})
+                      Rescheduled to {new Date(r.newDate).toLocaleDateString('en-IN')} ({r.newTimeSlot})
                     </span>
                     <p className="text-slate-500 mt-0.5">
-                      Updated by {r.role} on {new Date(r.timestamp).toLocaleDateString()}
+                      Updated by {r.role} on {new Date(r.timestamp).toLocaleDateString('en-IN')}
                       {r.reason ? ` — Note: "${r.reason}"` : ''}
                     </p>
                   </div>
@@ -469,7 +481,7 @@ const BookingDetailPage = () => {
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">Service Base / Estimate:</span>
                 <span className="text-base font-black text-slate-900">
-                  ${booking.pricing?.estimatedTotal || 0}
+                  ₹{booking.pricing?.estimatedTotal || 0}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-2">

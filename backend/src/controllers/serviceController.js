@@ -190,7 +190,7 @@ const createService = async (req, res) => {
       estimatedPriceRange: {
         min: estimatedPriceRange?.min || 0,
         max: estimatedPriceRange?.max || 0,
-        currency: estimatedPriceRange?.currency || 'USD'
+        currency: estimatedPriceRange?.currency || 'INR'
       },
       status: status || SERVICE_STATUS.ACTIVE
     });

@@ -9,7 +9,7 @@ const { PROVIDER_STATUS, SERVICE_PRICING_TYPE } = require('../utils/constants');
  */
 const getPublicProviders = async (req, res) => {
   try {
-    const { search, category, service, zipCode, city, minRating = 0, limit = 50, page = 1 } = req.query;
+    const { search, category, service, pincode, zipCode, city, minRating = 0, limit = 50, page = 1 } = req.query;
 
     // Strict security rule: Only VERIFIED providers appear in public marketplace
     const filter = { status: PROVIDER_STATUS.VERIFIED };
@@ -31,8 +31,12 @@ const getPublicProviders = async (req, res) => {
       filter['servicesOffered.isActive'] = true;
     }
 
-    if (zipCode && zipCode.trim()) {
-      filter['serviceArea.zipCodes'] = zipCode.trim();
+    const pin = (pincode || zipCode || '').trim();
+    if (pin) {
+      filter.$or = [
+        { 'serviceArea.pincodes': pin },
+        { 'serviceArea.zipCodes': pin }
+      ];
     }
 
     if (city && city.trim()) {
@@ -239,9 +243,16 @@ const updateMyProviderProfile = async (req, res) => {
     }
 
     if (serviceArea) {
+      const pins = Array.isArray(serviceArea.pincodes)
+        ? serviceArea.pincodes.map((z) => String(z).trim())
+        : Array.isArray(serviceArea.zipCodes)
+        ? serviceArea.zipCodes.map((z) => String(z).trim())
+        : profile.serviceArea?.pincodes || profile.serviceArea?.zipCodes || [];
+
       profile.serviceArea = {
         cities: Array.isArray(serviceArea.cities) ? serviceArea.cities.map((c) => String(c).trim()) : profile.serviceArea?.cities || [],
-        zipCodes: Array.isArray(serviceArea.zipCodes) ? serviceArea.zipCodes.map((z) => String(z).trim()) : profile.serviceArea?.zipCodes || [],
+        pincodes: pins,
+        zipCodes: pins,
         radiusKm: Number(serviceArea.radiusKm) || 25
       };
     }
@@ -353,7 +364,7 @@ const addServiceOffering = async (req, res) => {
       pricing: {
         type: pricing?.type || SERVICE_PRICING_TYPE.STARTING_AT,
         amount: Number(pricing?.amount) || serviceDoc.estimatedPriceRange?.min || 0,
-        currency: pricing?.currency || 'USD'
+        currency: pricing?.currency || 'INR'
       },
       isActive: true
     };

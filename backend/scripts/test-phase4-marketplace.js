@@ -97,7 +97,7 @@ const runPhase4Tests = async () => {
     // Set roles in MongoDB
     const proUser = await User.create({
       firebaseUid: proUid,
-      name: 'Test Pro Master Builder',
+      name: 'Rajesh Sharma',
       email: providerEmail,
       role: USER_ROLES.PROVIDER,
       status: USER_STATUS.ACTIVE
@@ -159,23 +159,24 @@ const runPhase4Tests = async () => {
       'PATCH',
       { Authorization: `Bearer ${proToken}` },
       {
-        businessName: 'Vance Elite Custom Renovations',
-        bio: 'Premier residential trade contractor with over 15 years experience in custom build and repair.',
-        licenseNumber: `LIC-${ts}`,
+        businessName: 'Sharma Home Services & AC Care',
+        bio: 'Premier residential electrical & HVAC contractor with over 12 years experience in Bengaluru.',
+        licenseNumber: `GSTIN-29AABCU-${ts.toString().slice(-4)}`,
         serviceArea: {
-          cities: ['Uptown', 'Harbor District', 'Midtown'],
-          zipCodes: ['10099', '10098'],
-          radiusKm: 35
+          cities: ['Bengaluru', 'Indiranagar', 'Koramangala'],
+          pincodes: ['560038', '560001'],
+          zipCodes: ['560038', '560001'],
+          radiusKm: 25
         },
         availability: {
           days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
-          workingHours: { start: '07:00', end: '19:00' },
+          workingHours: { start: '08:00', end: '20:00' },
           emergencyServices: true,
-          noticeHours: 12
+          noticeHours: 6
         }
       }
     );
-    if (updateProfileRes.status !== 200 || updateProfileRes.data?.data?.profile?.licenseNumber !== `LIC-${ts}`) {
+    if (updateProfileRes.status !== 200 || !updateProfileRes.data?.data?.profile?.licenseNumber?.startsWith('GSTIN')) {
       throw new Error(`Failed to update provider profile: ${JSON.stringify(updateProfileRes.data)}`);
     }
     console.log(`✓ Provider profile, service area, and availability schedule updated`);
@@ -195,19 +196,19 @@ const runPhase4Tests = async () => {
       { Authorization: `Bearer ${proToken}` },
       {
         serviceId: targetServiceId,
-        customTitle: 'Certified Master Repair Special',
-        description: 'Includes 50-point diagnostic check and premium grade materials.',
+        customTitle: 'Certified Master Jet Cleaning & Checkup',
+        description: 'Includes 50-point diagnostic check and genuine OEM components.',
         pricing: {
           type: 'FIXED',
-          amount: 275,
-          currency: 'USD'
+          amount: 499,
+          currency: 'INR'
         }
       }
     );
     if (addSrvRes.status !== 201 || !addSrvRes.data?.data?.offering) {
       throw new Error(`Failed to add service offering: ${JSON.stringify(addSrvRes.data)}`);
     }
-    console.log(`✓ Service offering added with custom pricing: $${addSrvRes.data.data.offering.pricing.amount}`);
+    console.log(`✓ Service offering added with custom pricing: ₹${addSrvRes.data.data.offering.pricing.amount}`);
 
     // Update service offering
     const patchSrvRes = await makeApiRequest(
@@ -216,14 +217,14 @@ const runPhase4Tests = async () => {
       'PATCH',
       { Authorization: `Bearer ${proToken}` },
       {
-        customTitle: 'Certified Master Repair Special (Updated)',
-        pricing: { type: 'FIXED', amount: 295, currency: 'USD' }
+        customTitle: 'Certified Master Jet Cleaning & Checkup (Updated)',
+        pricing: { type: 'FIXED', amount: 549, currency: 'INR' }
       }
     );
-    if (patchSrvRes.status !== 200 || patchSrvRes.data?.data?.offering?.pricing?.amount !== 295) {
+    if (patchSrvRes.status !== 200 || patchSrvRes.data?.data?.offering?.pricing?.amount !== 549) {
       throw new Error(`Failed to update service offering: ${JSON.stringify(patchSrvRes.data)}`);
     }
-    console.log(`✓ Service offering pricing updated to $295`);
+    console.log(`✓ Service offering pricing updated to ₹549`);
     console.log('✓ PASS: Test 3 (Service Offerings & Pricing)\n');
 
     // -------------------------------------------------------------
@@ -231,9 +232,9 @@ const runPhase4Tests = async () => {
     // -------------------------------------------------------------
     console.log('--- Test 4: Unverified Provider Isolation ---');
     // Public directory should NOT return the pending provider
-    const publicProsBefore = await makeApiRequest(testPort, '/api/providers?search=Vance');
+    const publicProsBefore = await makeApiRequest(testPort, '/api/providers?search=Sharma');
     const foundUnverified = (publicProsBefore.data?.data?.providers || []).some(
-      (p) => p.businessName.includes('Vance')
+      (p) => p.businessName.includes('Sharma')
     );
     if (foundUnverified) {
       throw new Error('SECURITY VIOLATION: Unverified/PENDING provider appeared in public customer search!');
@@ -243,7 +244,7 @@ const runPhase4Tests = async () => {
     // Public service detail should NOT list pending provider
     const srvDetailBefore = await makeApiRequest(testPort, `/api/services/${targetServiceId}`);
     const foundInService = (srvDetailBefore.data?.data?.providers || []).some(
-      (p) => p.businessName.includes('Vance')
+      (p) => p.businessName.includes('Sharma')
     );
     if (foundInService) {
       throw new Error('SECURITY VIOLATION: Unverified provider appeared in public service contractor list!');
@@ -276,7 +277,7 @@ const runPhase4Tests = async () => {
       `/api/admin/providers/${pendingTarget._id}/status`,
       'PATCH',
       { Authorization: `Bearer ${adminToken}` },
-      { status: 'VERIFIED', reason: 'License verified with state registry' }
+      { status: 'VERIFIED', reason: 'Trade license and GSTIN verified' }
     );
     if (approveRes.status !== 200 || approveRes.data?.data?.provider?.status !== 'VERIFIED') {
       throw new Error(`Admin failed to approve provider: ${JSON.stringify(approveRes.data)}`);
@@ -289,7 +290,7 @@ const runPhase4Tests = async () => {
     // -------------------------------------------------------------
     console.log('--- Test 6: Public Discovery of Verified Provider ---');
     // Now provider should be returned in public customer directory
-    const publicProsAfter = await makeApiRequest(testPort, '/api/providers?search=Vance');
+    const publicProsAfter = await makeApiRequest(testPort, '/api/providers?search=Sharma');
     if (publicProsAfter.status !== 200 || publicProsAfter.data?.data?.providers?.length === 0) {
       throw new Error('Verified provider was not found in public directory');
     }
@@ -303,23 +304,23 @@ const runPhase4Tests = async () => {
     }
     const proDetail = proDetailRes.data.data.provider;
     console.log(`✓ Public profile details retrieved: Rating=${proDetail.rating?.average}, Cities=${proDetail.serviceArea?.cities?.length}, Active Services=${proDetail.services?.length}`);
-    if (proDetail.services.length === 0 || proDetail.services[0].pricing?.amount !== 295) {
+    if (proDetail.services.length === 0 || proDetail.services[0].pricing?.amount !== 549) {
       throw new Error('Public profile does not reflect customized service pricing');
     }
     console.log('✓ PASS: Test 6 (Public Discovery of Verified Provider)\n');
 
     // -------------------------------------------------------------
-    // Test 7: Geographic Zip Code Filtering
+    // Test 7: Geographic Pincode / Zip Code Filtering
     // -------------------------------------------------------------
-    console.log('--- Test 7: Geographic Zip Code Filtering ---');
-    const zipFilterRes = await makeApiRequest(testPort, '/api/providers?zipCode=10099');
+    console.log('--- Test 7: Geographic PIN Code Filtering ---');
+    const zipFilterRes = await makeApiRequest(testPort, '/api/providers?pincode=560038');
     const matchedZip = (zipFilterRes.data?.data?.providers || []).some(
-      (p) => p.businessName.includes('Vance')
+      (p) => p.businessName.includes('Sharma')
     );
     if (!matchedZip) {
-      throw new Error('Zip code filter failed to return provider covering 10099');
+      throw new Error('Pincode filter failed to return provider covering 560038');
     }
-    console.log('✓ Zip code search successfully matched contractor service area');
+    console.log('✓ PIN code search successfully matched contractor service area');
     console.log('✓ PASS: Test 7 (Geographic Filtering)\n');
 
     // -------------------------------------------------------------

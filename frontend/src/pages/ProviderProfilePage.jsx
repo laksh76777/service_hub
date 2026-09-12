@@ -45,7 +45,8 @@ const ProviderProfilePage = () => {
         setPolicyNumber(p.insuranceDetails?.policyNumber || '');
 
         setCitiesInput(p.serviceArea?.cities?.join(', ') || '');
-        setZipCodesInput(p.serviceArea?.zipCodes?.join(', ') || '');
+        const existingPincodes = p.serviceArea?.pincodes?.length ? p.serviceArea.pincodes : p.serviceArea?.zipCodes;
+        setZipCodesInput(existingPincodes?.join(', ') || '');
         setRadiusKm(p.serviceArea?.radiusKm || 25);
 
         if (p.availability?.days?.length) setSelectedDays(p.availability.days);
@@ -99,6 +100,7 @@ const ProviderProfilePage = () => {
         serviceArea: {
           cities,
           zipCodes,
+          pincodes: zipCodes,
           radiusKm: Number(radiusKm)
         },
         availability: {
@@ -167,7 +169,7 @@ const ProviderProfilePage = () => {
           <div className="space-y-4">
             <Input
               label="Business / Trade Name"
-              placeholder="e.g. Precision HVAC & Electrical LLC"
+              placeholder="e.g. Sharma Electricals & AC Care"
               value={businessName}
               onChange={(e) => setBusinessName(e.target.value)}
               required
@@ -181,23 +183,23 @@ const ProviderProfilePage = () => {
                 rows={3}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Highlight your years in business, specialized equipment, warranties, and certifications..."
+                placeholder="Highlight your trade experience, verified technician team, warranties, and specialized equipment..."
                 className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="Contractor License Number"
-                placeholder="e.g. LIC-49021-MECH"
+                label="Contractor License / GSTIN / MSME Reg."
+                placeholder="e.g. 29ABCDE1234F1Z5 or MSME-KR-03-00123"
                 value={licenseNumber}
                 onChange={(e) => setLicenseNumber(e.target.value)}
                 helperText="Required for Admin Verification"
               />
 
               <Input
-                label="Commercial Insurance Provider"
-                placeholder="e.g. State Farm Commercial, Travelers"
+                label="Commercial Insurance / Guarantee Provider"
+                placeholder="e.g. ICICI Lombard, HDFC ERGO, National Insurance"
                 value={insuranceProvider}
                 onChange={(e) => setInsuranceProvider(e.target.value)}
               />
@@ -212,19 +214,19 @@ const ProviderProfilePage = () => {
         >
           <div className="space-y-4">
             <Input
-              label="Covered Municipalities / Cities (Comma-separated)"
-              placeholder="e.g. Downtown, Westside, North Valley, Silver Lake"
+              label="Covered Municipalities / Localities (Comma-separated)"
+              placeholder="e.g. Bengaluru, Indiranagar, Koramangala, Whitefield, HSR Layout"
               value={citiesInput}
               onChange={(e) => setCitiesInput(e.target.value)}
-              helperText="Separate multiple cities with commas"
+              helperText="Separate multiple localities with commas"
             />
 
             <Input
-              label="Covered Zip Codes (Comma-separated)"
-              placeholder="e.g. 10001, 10002, 10003, 90210"
+              label="Covered PIN Codes (6-digit, comma-separated)"
+              placeholder="e.g. 560001, 560034, 560038, 560066"
               value={zipCodesInput}
               onChange={(e) => setZipCodesInput(e.target.value)}
-              helperText="Customers can search providers by entering their postal code"
+              helperText="Customers can search providers by entering their 6-digit PIN code"
             />
 
             <div>

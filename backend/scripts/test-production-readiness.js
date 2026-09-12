@@ -135,13 +135,13 @@ async function runProductionReadinessSuite() {
     // DISCIPLINE 5: Authorization Testing (RBAC)
     // -------------------------------------------------------------------------
     console.log('\n5. AUTHORIZATION TESTING (RBAC)');
-    // Find customer and provider
+    // Find customer, technician, and admin
     const customer = await User.findOne({ role: USER_ROLES.CUSTOMER });
-    const provider = await User.findOne({ role: USER_ROLES.PROVIDER });
+    const provider = await User.findOne({ role: { $in: [USER_ROLES.TECHNICIAN, 'TECHNICIAN', 'PROVIDER'] } });
     const admin = await User.findOne({ role: USER_ROLES.ADMIN });
 
     check(customer !== null, 'Customer test identity exists');
-    check(provider !== null, 'Provider test identity exists');
+    check(provider !== null, 'Technician test identity exists');
     check(admin !== null, 'Admin test identity exists');
 
     // -------------------------------------------------------------------------

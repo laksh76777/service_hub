@@ -16,8 +16,8 @@ const router = express.Router();
 // Apply authentication to all booking endpoints
 router.use(requireAuth);
 
-// Customer or Admin can create a booking
-router.post('/', requireRole(USER_ROLES.CUSTOMER, USER_ROLES.ADMIN), createBooking);
+// Customer requests a service booking
+router.post('/', requireRole(USER_ROLES.CUSTOMER), createBooking);
 
 // User can view their list of bookings (filtered by role internally)
 router.get('/', getBookings);

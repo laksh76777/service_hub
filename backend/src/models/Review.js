@@ -15,10 +15,19 @@ const reviewSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      index: true
+    },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
       index: true
     },
     rating: {
@@ -29,6 +38,10 @@ const reviewSchema = new mongoose.Schema(
       index: true
     },
     comment: {
+      type: String,
+      trim: true
+    },
+    review: {
       type: String,
       trim: true
     },
@@ -43,6 +56,22 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
+reviewSchema.pre('validate', function () {
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
+
+  if (this.review && !this.comment) {
+    this.comment = this.review;
+  } else if (this.comment && !this.review) {
+    this.review = this.comment;
+  }
+});
+
+reviewSchema.index({ serviceId: 1 });
 reviewSchema.index({ providerId: 1, rating: -1 });
+reviewSchema.index({ technicianId: 1, rating: -1 });
 
 module.exports = mongoose.model('Review', reviewSchema);

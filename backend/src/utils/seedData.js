@@ -80,7 +80,44 @@ const seedMarketplaceData = async () => {
 
     // 2. Services
     const servicesData = [
-      // AC
+      // 5 Canonical Primary Services
+      {
+        categoryId: catMap['ac-servicing-repair'],
+        name: 'AC Repair',
+        slug: 'ac-repair',
+        description: 'Complete inspection, diagnostics, gas charging, cooling coil fix, and spare part replacement for all AC brands.',
+        estimatedPriceRange: { min: 499, max: 1999, currency: 'INR' }
+      },
+      {
+        categoryId: catMap['plumbing'],
+        name: 'Plumbing',
+        slug: 'plumbing',
+        description: 'Expert plumbing services for pipeline leaks, tap & valve fixes, drain blockages, and bathroom sanitary fittings.',
+        estimatedPriceRange: { min: 249, max: 999, currency: 'INR' }
+      },
+      {
+        categoryId: catMap['electrical-repair'],
+        name: 'Electrical Repair',
+        slug: 'electrical-repair',
+        description: 'Certified electrical repair for short circuits, MCB breaker trips, switchboard issues, and wiring faults.',
+        estimatedPriceRange: { min: 249, max: 899, currency: 'INR' }
+      },
+      {
+        categoryId: catMap['ro-water-purifier'],
+        name: 'RO Repair',
+        slug: 'ro-repair',
+        description: 'RO water purifier servicing, multi-stage filter replacement, booster pump repair, and digital TDS water testing.',
+        estimatedPriceRange: { min: 399, max: 1499, currency: 'INR' }
+      },
+      {
+        categoryId: catMap['appliance-repair'],
+        name: 'Appliance Repair',
+        slug: 'appliance-repair',
+        description: 'Comprehensive home appliance diagnosis and repair for refrigerators, washing machines, and geysers.',
+        estimatedPriceRange: { min: 349, max: 1299, currency: 'INR' }
+      },
+
+      // AC Detailed Services
       {
         categoryId: catMap['ac-servicing-repair'],
         name: 'AC Inspection & Diagnostics',
@@ -302,19 +339,26 @@ const seedMarketplaceData = async () => {
     );
     console.log(`[Seed] Demo Customer saved address ready: ${customerAddress.addressLine1}, ${customerAddress.city}`);
 
-    // 3c. TECHNICIAN 1: Rahul Sharma (CoolCare Services - AC Repair & Service)
+    // 3c. TECHNICIAN 1: Rahul Sharma (CoolCare Services - AC Technician)
     const techUser1 = await User.findOneAndUpdate(
-      { email: 'ac.tech@servicehub.demo' },
+      { email: 'ac@gmail.com' },
       {
         $setOnInsert: { firebaseUid: 'demo_tech_uid_ac' },
         $set: {
           name: 'Rahul Sharma',
           phone: '+91 98765 43210',
-          role: USER_ROLES.PROVIDER,
+          role: USER_ROLES.TECHNICIAN,
           status: USER_STATUS.ACTIVE
         }
       },
       { upsert: true, new: true }
+    );
+
+    // Keep legacy alias in sync for backward compatibility with older test suites
+    await User.findOneAndUpdate(
+      { email: 'ac.tech@servicehub.demo' },
+      { $set: { name: 'Rahul Sharma', role: USER_ROLES.TECHNICIAN, status: USER_STATUS.ACTIVE } },
+      { upsert: true }
     );
 
     await ProviderProfile.findOneAndUpdate(
@@ -322,8 +366,11 @@ const seedMarketplaceData = async () => {
       {
         $set: {
           userId: techUser1._id,
-          businessName: 'CoolCare Services',
-          bio: 'Professional AC Repair & Service Technician with 6 years experience in Bengaluru. Certified multi-brand expert for Daikin, Voltas, LG, and Hitachi. 100% genuine parts and 30-day workmanship guarantee.',
+          businessName: 'CoolCare AC Solutions',
+          profession: 'AC Technician',
+          experience: '6 years',
+          experienceYears: 6,
+          bio: 'Professional AC Technician with 6 years experience in Bengaluru. Certified multi-brand expert for Daikin, Voltas, LG, and Hitachi. 100% genuine parts and 30-day workmanship guarantee.',
           licenseNumber: 'KA-HVAC-2021',
           insuranceDetails: { provider: 'HDFC ERGO Commercial Insurance', policyNumber: 'HE-9021-HVAC' },
           categories: [catMap['ac-servicing-repair']],
@@ -341,6 +388,13 @@ const seedMarketplaceData = async () => {
             noticeHours: 4
           },
           servicesOffered: [
+            {
+              serviceId: srvMap['ac-repair']._id,
+              customTitle: 'AC Repair',
+              description: 'Complete inspection, diagnostics, gas charging, cooling coil fix, and spare part replacement for all AC brands.',
+              pricing: { type: SERVICE_PRICING_TYPE.FIXED, amount: 499, currency: 'INR' },
+              isActive: true
+            },
             {
               serviceId: srvMap['ac-inspection-diagnostics']._id,
               customTitle: 'AC Inspection & Complete Diagnosis Visit',
@@ -383,21 +437,27 @@ const seedMarketplaceData = async () => {
       },
       { upsert: true, new: true }
     );
-    console.log(`[Seed] Demo Technician 1 ready: Rahul Sharma (CoolCare Services)`);
+    console.log(`[Seed] Demo Technician 1 ready: Rahul Sharma (ac@gmail.com - AC Technician)`);
 
-    // 3d. TECHNICIAN 2: Imran Khan (QuickFix Plumbing)
+    // 3d. TECHNICIAN 2: Imran Khan (QuickFix Plumbing - Plumber)
     const techUser2 = await User.findOneAndUpdate(
-      { email: 'plumber@servicehub.demo' },
+      { email: 'plumber@gmail.com' },
       {
         $setOnInsert: { firebaseUid: 'demo_tech_uid_plumber' },
         $set: {
           name: 'Imran Khan',
           phone: '+91 98123 45678',
-          role: USER_ROLES.PROVIDER,
+          role: USER_ROLES.TECHNICIAN,
           status: USER_STATUS.ACTIVE
         }
       },
       { upsert: true, new: true }
+    );
+
+    await User.findOneAndUpdate(
+      { email: 'plumber@servicehub.demo' },
+      { $set: { name: 'Imran Khan', role: USER_ROLES.TECHNICIAN, status: USER_STATUS.ACTIVE } },
+      { upsert: true }
     );
 
     await ProviderProfile.findOneAndUpdate(
@@ -406,6 +466,9 @@ const seedMarketplaceData = async () => {
         $set: {
           userId: techUser2._id,
           businessName: 'QuickFix Plumbing',
+          profession: 'Plumber',
+          experience: '7 years',
+          experienceYears: 7,
           bio: 'Experienced plumbing technician with 7 years serving Bengaluru apartments and homes. Specialist in concealed pipe leakage, tap repairs, overhead tank cleanups, and bathroom fittings.',
           licenseNumber: 'KA-PLUMB-2020',
           insuranceDetails: { provider: 'ICICI Lombard Commercial', policyNumber: 'IL-8832-PL' },
@@ -424,6 +487,13 @@ const seedMarketplaceData = async () => {
             noticeHours: 2
           },
           servicesOffered: [
+            {
+              serviceId: srvMap['plumbing']._id,
+              customTitle: 'Plumbing',
+              description: 'Expert plumbing services for pipeline leaks, tap & valve fixes, drain blockages, and bathroom sanitary fittings.',
+              pricing: { type: SERVICE_PRICING_TYPE.STARTING_AT, amount: 249, currency: 'INR' },
+              isActive: true
+            },
             {
               serviceId: srvMap['plumbing-general-visit-inspection']._id,
               customTitle: 'Plumbing Visit & Inspection Call',
@@ -459,21 +529,27 @@ const seedMarketplaceData = async () => {
       },
       { upsert: true, new: true }
     );
-    console.log(`[Seed] Demo Technician 2 ready: Imran Khan (QuickFix Plumbing)`);
+    console.log(`[Seed] Demo Technician 2 ready: Imran Khan (plumber@gmail.com - Plumber)`);
 
-    // 3e. TECHNICIAN 3: Arjun Patel (PowerFix Electricals)
+    // 3e. TECHNICIAN 3: Arjun Patel (PowerFix Electricals - Electrician)
     const techUser3 = await User.findOneAndUpdate(
-      { email: 'electrician@servicehub.demo' },
+      { email: 'electrician@gmail.com' },
       {
         $setOnInsert: { firebaseUid: 'demo_tech_uid_electrician' },
         $set: {
           name: 'Arjun Patel',
           phone: '+91 98987 65432',
-          role: USER_ROLES.PROVIDER,
+          role: USER_ROLES.TECHNICIAN,
           status: USER_STATUS.ACTIVE
         }
       },
       { upsert: true, new: true }
+    );
+
+    await User.findOneAndUpdate(
+      { email: 'electrician@servicehub.demo' },
+      { $set: { name: 'Arjun Patel', role: USER_ROLES.TECHNICIAN, status: USER_STATUS.ACTIVE } },
+      { upsert: true }
     );
 
     await ProviderProfile.findOneAndUpdate(
@@ -482,6 +558,9 @@ const seedMarketplaceData = async () => {
         $set: {
           userId: techUser3._id,
           businessName: 'PowerFix Electricals',
+          profession: 'Electrician',
+          experience: '5 years',
+          experienceYears: 5,
           bio: 'Licensed electrical technician with 5 years experience across Bengaluru. Rapid dispatch for MCB tripping, ceiling fans, power point wiring, switchboard fix, and inverter installation.',
           licenseNumber: 'KA-ELEC-2022',
           insuranceDetails: { provider: 'National Insurance Trade Shield', policyNumber: 'NI-4412-ELEC' },
@@ -500,6 +579,13 @@ const seedMarketplaceData = async () => {
             noticeHours: 3
           },
           servicesOffered: [
+            {
+              serviceId: srvMap['electrical-repair']._id,
+              customTitle: 'Electrical Repair',
+              description: 'Certified electrical repair for short circuits, MCB breaker trips, switchboard issues, and wiring faults.',
+              pricing: { type: SERVICE_PRICING_TYPE.STARTING_AT, amount: 249, currency: 'INR' },
+              isActive: true
+            },
             {
               serviceId: srvMap['electrical-general-visit-diagnosis']._id,
               customTitle: 'Electrical Visit & Fault Diagnosis Call',
@@ -535,7 +621,151 @@ const seedMarketplaceData = async () => {
       },
       { upsert: true, new: true }
     );
-    console.log(`[Seed] Demo Technician 3 ready: Arjun Patel (PowerFix Electricals)`);
+    console.log(`[Seed] Demo Technician 3 ready: Arjun Patel (electrician@gmail.com - Electrician)`);
+
+    // 3f. TECHNICIAN 4: Suresh Verma (PureFlow RO Systems - RO Technician)
+    const techUser4 = await User.findOneAndUpdate(
+      { email: 'ro@gmail.com' },
+      {
+        $setOnInsert: { firebaseUid: 'demo_tech_uid_ro' },
+        $set: {
+          name: 'Suresh Verma',
+          phone: '+91 97654 32109',
+          role: USER_ROLES.TECHNICIAN,
+          status: USER_STATUS.ACTIVE
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    await ProviderProfile.findOneAndUpdate(
+      { userId: techUser4._id },
+      {
+        $set: {
+          userId: techUser4._id,
+          businessName: 'PureFlow RO Systems',
+          profession: 'RO Technician',
+          experience: '4 years',
+          experienceYears: 4,
+          bio: 'Certified water purification specialist with 4 years experience. Expertise in Kent, Aquaguard, Pureit, and Livpure. Comprehensive filter replacement, membrane descaling, booster pump testing, and digital TDS calibration.',
+          licenseNumber: 'KA-RO-2023',
+          insuranceDetails: { provider: 'Bajaj Allianz General Insurance', policyNumber: 'BA-7719-RO' },
+          categories: [catMap['ro-water-purifier']],
+          status: PROVIDER_STATUS.VERIFIED,
+          serviceArea: {
+            cities: ['Bengaluru', 'Hebbal', 'Yelahanka', 'Malleshwaram'],
+            pincodes: ['560001', '560003', '560024', '560064'],
+            zipCodes: ['560001', '560003', '560024', '560064'],
+            radiusKm: 25
+          },
+          availability: {
+            days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+            workingHours: { start: '09:00', end: '19:00' },
+            emergencyServices: false,
+            noticeHours: 3
+          },
+          servicesOffered: [
+            {
+              serviceId: srvMap['ro-repair']._id,
+              customTitle: 'RO Repair',
+              description: 'RO water purifier servicing, multi-stage filter replacement, booster pump repair, and digital TDS water testing.',
+              pricing: { type: SERVICE_PRICING_TYPE.FIXED, amount: 399, currency: 'INR' },
+              isActive: true
+            },
+            {
+              serviceId: srvMap['ro-purifier-filter-replacement']._id,
+              customTitle: 'RO Purifier Complete Filter Replacement & Service',
+              description: 'Sediment, carbon block, and post-carbon filter renewal with TDS quality calibration.',
+              pricing: { type: SERVICE_PRICING_TYPE.FIXED, amount: 649, currency: 'INR' },
+              isActive: true
+            }
+          ],
+          rating: { average: 4.8, count: 41 },
+          completedJobsCount: 84
+        }
+      },
+      { upsert: true, new: true }
+    );
+    console.log(`[Seed] Demo Technician 4 ready: Suresh Verma (ro@gmail.com - RO Technician)`);
+
+    // 3g. TECHNICIAN 5: Vikram Singh (SmartCare Home Appliances - Home Appliance Technician)
+    const techUser5 = await User.findOneAndUpdate(
+      { email: 'appliance@gmail.com' },
+      {
+        $setOnInsert: { firebaseUid: 'demo_tech_uid_appliance' },
+        $set: {
+          name: 'Vikram Singh',
+          phone: '+91 96543 21098',
+          role: USER_ROLES.TECHNICIAN,
+          status: USER_STATUS.ACTIVE
+        }
+      },
+      { upsert: true, new: true }
+    );
+
+    await ProviderProfile.findOneAndUpdate(
+      { userId: techUser5._id },
+      {
+        $set: {
+          userId: techUser5._id,
+          businessName: 'SmartCare Home Appliances',
+          profession: 'Home Appliance Technician',
+          experience: '8 years',
+          experienceYears: 8,
+          bio: 'Master home appliance technician with 8 years hands-on field experience. Specialist in double-door refrigerators, front/top load washing machines, microwave ovens, and storage geysers. Genuine spare parts guaranteed.',
+          licenseNumber: 'KA-APPL-2019',
+          insuranceDetails: { provider: 'Tata AIG General Insurance', policyNumber: 'TA-9921-APPL' },
+          categories: [catMap['appliance-repair']],
+          status: PROVIDER_STATUS.VERIFIED,
+          serviceArea: {
+            cities: ['Bengaluru', 'Indiranagar', 'Bellandur', 'Marathahalli'],
+            pincodes: ['560001', '560037', '560038', '560103'],
+            zipCodes: ['560001', '560037', '560038', '560103'],
+            radiusKm: 30
+          },
+          availability: {
+            days: ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'],
+            workingHours: { start: '08:00', end: '20:00' },
+            emergencyServices: true,
+            noticeHours: 2
+          },
+          servicesOffered: [
+            {
+              serviceId: srvMap['appliance-repair']._id,
+              customTitle: 'Appliance Repair',
+              description: 'Comprehensive home appliance diagnosis and repair for refrigerators, washing machines, and geysers.',
+              pricing: { type: SERVICE_PRICING_TYPE.STARTING_AT, amount: 349, currency: 'INR' },
+              isActive: true
+            },
+            {
+              serviceId: srvMap['refrigerator-cooling-compressor-diagnosis']._id,
+              customTitle: 'Refrigerator Cooling & Compressor Diagnostics',
+              description: 'Relay, thermostat, cooling gas, and fan motor diagnostic inspection.',
+              pricing: { type: SERVICE_PRICING_TYPE.STARTING_AT, amount: 399, currency: 'INR' },
+              isActive: true
+            },
+            {
+              serviceId: srvMap['washing-machine-spin-drain-diagnostic']._id,
+              customTitle: 'Washing Machine Spin & Drain Diagnostic',
+              description: 'Vibration, motor belt, drain pump blockage, and electronic PCB check.',
+              pricing: { type: SERVICE_PRICING_TYPE.FIXED, amount: 349, currency: 'INR' },
+              isActive: true
+            },
+            {
+              serviceId: srvMap['geyser-water-heater-element-repair']._id,
+              customTitle: 'Geyser / Water Heater Heating Element Fix',
+              description: 'Thermostat replacement, tank descaling, and heating element repair.',
+              pricing: { type: SERVICE_PRICING_TYPE.FIXED, amount: 399, currency: 'INR' },
+              isActive: true
+            }
+          ],
+          rating: { average: 4.9, count: 75 },
+          completedJobsCount: 140
+        }
+      },
+      { upsert: true, new: true }
+    );
+    console.log(`[Seed] Demo Technician 5 ready: Vikram Singh (appliance@gmail.com - Home Appliance Technician)`);
 
     // =========================================================================
     // 4. DEMO END-TO-END FLOW SAMPLE BOOKING

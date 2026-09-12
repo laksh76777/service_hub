@@ -32,21 +32,52 @@ const DEMO_ACCOUNTS = [
     name: 'Laksh Suthar'
   },
   {
+    email: 'ac@gmail.com',
+    password: process.env.DEMO_PASSWORD || '123456',
+    role: 'TECHNICIAN',
+    name: 'Rahul Sharma'
+  },
+  {
+    email: 'plumber@gmail.com',
+    password: process.env.DEMO_PASSWORD || '123456',
+    role: 'TECHNICIAN',
+    name: 'Imran Khan'
+  },
+  {
+    email: 'electrician@gmail.com',
+    password: process.env.DEMO_PASSWORD || '123456',
+    role: 'TECHNICIAN',
+    name: 'Arjun Patel'
+  },
+  {
+    email: 'ro@gmail.com',
+    password: process.env.DEMO_PASSWORD || '123456',
+    role: 'TECHNICIAN',
+    name: 'Suresh Verma'
+  },
+  {
+    email: 'appliance@gmail.com',
+    password: process.env.DEMO_PASSWORD || '123456',
+    role: 'TECHNICIAN',
+    name: 'Vikram Singh'
+  },
+  // Legacy aliases
+  {
     email: 'ac.tech@servicehub.demo',
     password: process.env.DEMO_PASSWORD || '123456',
-    role: 'PROVIDER',
+    role: 'TECHNICIAN',
     name: 'Rahul Sharma'
   },
   {
     email: 'plumber@servicehub.demo',
     password: process.env.DEMO_PASSWORD || '123456',
-    role: 'PROVIDER',
+    role: 'TECHNICIAN',
     name: 'Imran Khan'
   },
   {
     email: 'electrician@servicehub.demo',
     password: process.env.DEMO_PASSWORD || '123456',
-    role: 'PROVIDER',
+    role: 'TECHNICIAN',
     name: 'Arjun Patel'
   }
 ];

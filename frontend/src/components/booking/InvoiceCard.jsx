@@ -76,7 +76,7 @@ const InvoiceCard = ({ booking, isCustomer, isProvider, isAdmin, onInvoiceCreate
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md mx-auto">
             Invoices are compiled from approved work estimates after completion verification.
           </p>
-          {(isProvider || isAdmin) && ['CUSTOMER_VERIFIED', 'COMPLETED'].includes(booking.status) && (
+          {(isProvider || isCustomer || isAdmin) && ['CUSTOMER_VERIFIED', 'CUSTOMER_CONFIRMED', 'WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(booking.status) && (
             <div className="mt-4">
               <Button
                 size="sm"
@@ -84,7 +84,7 @@ const InvoiceCard = ({ booking, isCustomer, isProvider, isAdmin, onInvoiceCreate
                 loading={generating}
                 onClick={handleGenerateInvoice}
               >
-                Generate Final Tax Invoice
+                Generate / Finalize Invoice
               </Button>
             </div>
           )}
@@ -92,27 +92,57 @@ const InvoiceCard = ({ booking, isCustomer, isProvider, isAdmin, onInvoiceCreate
       ) : (
         <div className="mt-4 space-y-4">
           {/* Invoice Header Details */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 text-xs">
             <div>
               <span className="text-gray-400 text-[10px] uppercase font-bold block">Invoice Number</span>
-              <span className="font-mono font-bold text-gray-900 dark:text-white text-sm">
+              <span className="font-mono font-bold text-gray-900 dark:text-white text-xs">
                 {invoice.invoiceNumber}
               </span>
             </div>
             <div>
-              <span className="text-gray-400 text-[10px] uppercase font-bold block">Issue Date</span>
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                {new Date(invoice.issuedAt || invoice.createdAt).toLocaleDateString('en-IN')}
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Customer</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">
+                {invoice.customerId?.name || booking.customerId?.name || 'Customer'}
               </span>
             </div>
             <div>
-              <span className="text-gray-400 text-[10px] uppercase font-bold block">Status</span>
-              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${
-                invoice.status === 'PAID'
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Technician</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">
+                {invoice.technicianId?.name || invoice.providerId?.name || booking.technicianId?.name || 'Technician'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Service & Booking</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {invoice.serviceId?.name || booking.serviceId?.name || 'Service'} ({booking.bookingNumber})
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Invoice Date</span>
+              <span className="font-medium text-gray-800 dark:text-gray-200">
+                {new Date(invoice.date || invoice.issuedAt || invoice.createdAt).toLocaleDateString('en-IN')}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Amount & Currency</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                ₹{invoice.amount || invoice.total} {invoice.currency || 'INR'}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Payment Status</span>
+              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                (invoice.paymentStatus === 'PAID' || invoice.status === 'PAID')
                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                  : 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                  : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
               }`}>
-                {invoice.status === 'PAID' ? '✓ PAID' : invoice.status}
+                {(invoice.paymentStatus === 'PAID' || invoice.status === 'PAID') ? '✓ PAID' : (invoice.paymentStatus || invoice.status)}
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 text-[10px] uppercase font-bold block">Invoice Status</span>
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                {invoice.status}
               </span>
             </div>
           </div>

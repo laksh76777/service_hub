@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const Invoice = require('../models/Invoice');
 const Estimate = require('../models/Estimate');
 const Booking = require('../models/Booking');
-const { INVOICE_STATUS, ESTIMATE_STATUS, USER_ROLES } = require('../utils/constants');
+const notificationService = require('../services/notificationService');
+const { INVOICE_STATUS, ESTIMATE_STATUS, USER_ROLES, NOTIFICATION_TYPE } = require('../utils/constants');
 const { generateInvoicePdf } = require('../services/invoicePdfService');
 
 /**
@@ -31,13 +32,16 @@ const generateInvoice = async (req, res) => {
       });
     }
 
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isCustomer = (booking.customerId?._id || booking.customerId)?.toString() === req.user._id.toString();
+    const isTechnician =
+      (booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString() ||
+      (booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isProvider && !isAdmin) {
+    if (!isCustomer && !isTechnician && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Only the assigned provider or admin can generate an invoice.'
+        message: 'Access denied: You are not authorized to generate an invoice for this booking.'
       });
     }
 
@@ -45,46 +49,58 @@ const generateInvoice = async (req, res) => {
     const existingActiveInvoice = await Invoice.findOne({
       bookingId: booking._id,
       status: { $ne: INVOICE_STATUS.CANCELLED }
-    });
+    })
+      .populate('customerId', 'name email phone')
+      .populate('technicianId', 'name email phone')
+      .populate('providerId', 'name email phone')
+      .populate('serviceId', 'name slug description')
+      .populate('bookingId');
 
     if (existingActiveInvoice) {
       return res.status(400).json({
         success: false,
-        message: `An active invoice (${existingActiveInvoice.invoiceNumber}) has already been issued for this booking. Duplicate invoices are strictly prevented.`,
+        message: `An invoice (${existingActiveInvoice.invoiceNumber}) has already been generated for this booking. Duplicate invoices are strictly prohibited.`,
         invoice: existingActiveInvoice
       });
     }
 
-    // Compile only APPROVED estimate items (initial + approved additional work)
+    // Compile approved estimate items or completed service booking pricing
     const approvedEstimates = await Estimate.find({
       bookingId: booking._id,
       status: ESTIMATE_STATUS.APPROVED
     });
 
-    if (approvedEstimates.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot generate invoice: No customer-approved estimates found for this booking. Estimates must be approved by customer before invoicing.'
-      });
-    }
-
-    // Extract all approved line items
     const billedItems = [];
     let totalDiscount = 0;
 
-    for (const est of approvedEstimates) {
-      if (est.discount > 0) totalDiscount += est.discount;
-      for (const item of est.items) {
-        billedItems.push({
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
-          type: item.type,
-          sourceEstimateId: est._id,
-          isAdditionalWork: Boolean(est.isAdditionalWork)
-        });
+    if (approvedEstimates.length > 0) {
+      for (const est of approvedEstimates) {
+        if (est.discount > 0) totalDiscount += est.discount;
+        for (const item of est.items) {
+          billedItems.push({
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
+            type: item.type,
+            sourceEstimateId: est._id,
+            isAdditionalWork: Boolean(est.isAdditionalWork)
+          });
+        }
       }
+    } else if (booking.pricing?.totalAmount > 0) {
+      billedItems.push({
+        description: booking.problemDescription || 'Standard Service Fee',
+        quantity: 1,
+        unitPrice: booking.pricing.totalAmount,
+        amount: booking.pricing.totalAmount,
+        type: 'SERVICE'
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot generate invoice: No customer-approved estimates or service pricing found for this booking.'
+      });
     }
 
     // Zero-trust calculation
@@ -92,32 +108,63 @@ const generateInvoice = async (req, res) => {
     const tax = Math.round(subtotal * 0.18 * 100) / 100; // 18% GST
     const discount = Math.round(totalDiscount * 100) / 100;
     const total = Math.max(0, Math.round((subtotal + tax - discount) * 100) / 100);
+    const amount = total;
+
+    const isPaid = Boolean(
+      booking.pricing?.isPaid ||
+      ['PAYMENT_SUCCESS', 'WORK_IN_PROGRESS', 'WORK_COMPLETED', 'CUSTOMER_CONFIRMED', 'INVOICED', 'COMPLETED'].includes(booking.status)
+    );
 
     const invoiceNumber = generateInvoiceNumber();
+    const techId = booking.technicianId || booking.providerId;
 
     const invoice = await Invoice.create({
       invoiceNumber,
       bookingId: booking._id,
       customerId: booking.customerId,
-      providerId: booking.providerId,
+      technicianId: techId,
+      providerId: techId,
+      serviceId: booking.serviceId,
       items: billedItems,
       subtotal,
       tax,
       taxes: tax,
       discount,
       total,
-      paidAmount: 0,
-      amountPaid: 0,
-      remainingAmount: total,
-      status: INVOICE_STATUS.ISSUED,
+      amount,
+      currency: 'INR',
+      paymentStatus: isPaid ? 'PAID' : 'PENDING',
+      date: new Date(),
+      paidAmount: isPaid ? total : 0,
+      amountPaid: isPaid ? total : 0,
+      remainingAmount: isPaid ? 0 : total,
+      status: isPaid ? INVOICE_STATUS.PAID : INVOICE_STATUS.ISSUED,
       dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-      issuedAt: new Date()
+      issuedAt: new Date(),
+      paidAt: isPaid ? (booking.pricing?.paidAt || new Date()) : undefined
     });
 
     const populated = await Invoice.findById(invoice._id)
       .populate('customerId', 'name email phone')
+      .populate('technicianId', 'name email phone')
       .populate('providerId', 'name email phone')
+      .populate('serviceId', 'name slug description')
       .populate('bookingId');
+
+    // Notify Customer: Invoice generated
+    try {
+      await notificationService.notify({
+        recipientId: invoice.customerId,
+        senderId: invoice.providerId,
+        bookingId: booking._id,
+        type: NOTIFICATION_TYPE.INVOICE_GENERATED,
+        title: 'Invoice Generated',
+        message: `Tax invoice ${invoice.invoiceNumber} for ₹${invoice.total} has been generated for booking ${booking.bookingNumber || ''}.`,
+        data: { bookingId: booking._id, invoiceId: invoice._id, invoiceNumber: invoice.invoiceNumber, total: invoice.total }
+      });
+    } catch (notifErr) {
+      console.warn('[InvoiceController] Notification failed:', notifErr.message);
+    }
 
     return res.status(201).json({
       success: true,
@@ -150,7 +197,9 @@ const getInvoiceByBooking = async (req, res) => {
     }
 
     const isCustomer = booking.customerId.toString() === req.user._id.toString();
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isProvider =
+      (booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString() ||
+      (booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
     if (!isCustomer && !isProvider && !isAdmin) {
@@ -162,7 +211,9 @@ const getInvoiceByBooking = async (req, res) => {
 
     const invoice = await Invoice.findOne({ bookingId })
       .populate('customerId', 'name email phone')
+      .populate('technicianId', 'name email phone')
       .populate('providerId', 'name email phone')
+      .populate('serviceId', 'name slug description')
       .populate('bookingId');
 
     if (!invoice) {
@@ -193,7 +244,9 @@ const getInvoiceById = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id)
       .populate('customerId', 'name email phone')
+      .populate('technicianId', 'name email phone')
       .populate('providerId', 'name email phone')
+      .populate('serviceId', 'name slug description')
       .populate('bookingId');
 
     if (!invoice) {
@@ -203,8 +256,10 @@ const getInvoiceById = async (req, res) => {
       });
     }
 
-    const isCustomer = invoice.customerId._id.toString() === req.user._id.toString();
-    const isProvider = invoice.providerId._id.toString() === req.user._id.toString();
+    const isCustomer = (invoice.customerId?._id || invoice.customerId)?.toString() === req.user._id.toString();
+    const isProvider =
+      (invoice.technicianId?._id || invoice.technicianId)?.toString() === req.user._id.toString() ||
+      (invoice.providerId?._id || invoice.providerId)?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
     if (!isCustomer && !isProvider && !isAdmin) {

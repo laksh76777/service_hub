@@ -13,6 +13,11 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
+    bookingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Booking',
+      index: true
+    },
     type: {
       type: String,
       enum: Object.values(NOTIFICATION_TYPE),
@@ -44,11 +49,18 @@ const notificationSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    collection: 'notifications'
+    collection: 'notifications',
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
+notificationSchema.virtual('relatedBooking').get(function () {
+  return this.bookingId || this.data?.bookingId || null;
+});
+
 notificationSchema.index({ recipientId: 1, isRead: 1 });
 notificationSchema.index({ recipientId: 1, createdAt: -1 });
+notificationSchema.index({ bookingId: 1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

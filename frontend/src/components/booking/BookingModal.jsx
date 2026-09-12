@@ -169,6 +169,21 @@ const BookingModal = ({
   }, [initialService, initialProvider]);
 
   useEffect(() => {
+    if (selectedServiceId && isOpen) {
+      getProviders({ service: selectedServiceId })
+        .then((res) => {
+          const list = res?.data?.technicians || res?.data?.providers || [];
+          setProviders(list);
+          if (list.length > 0 && !list.some((p) => (p.userId?._id || p.id) === selectedProviderId)) {
+            const firstId = list[0].userId?._id?.toString() || list[0].userId?.toString() || list[0].id?.toString() || '';
+            setSelectedProviderId(firstId);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [selectedServiceId, isOpen]);
+
+  useEffect(() => {
     if (isOpen) {
       fetchOptions();
     }
@@ -190,7 +205,7 @@ const BookingModal = ({
     }
 
     if (!selectedServiceId || !selectedProviderId) {
-      setError('Please select both a service and a verified provider.');
+      setError('Please select both a service and a verified technician.');
       return;
     }
 
@@ -241,6 +256,7 @@ const BookingModal = ({
 
       const payload = {
         serviceId: selectedServiceId,
+        technicianId: selectedProviderId,
         providerId: selectedProviderId,
         address: addressPayload,
         scheduledDate,
@@ -305,7 +321,7 @@ const BookingModal = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Select Verified Provider *
+              Select Verified Technician *
             </label>
             <select
               value={selectedProviderId}
@@ -313,15 +329,15 @@ const BookingModal = ({
               required
               className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">-- Choose Provider --</option>
+              <option value="">-- Choose Verified Technician --</option>
               {providers.map((p, idx) => {
                 // Backend expects the User's _id (looked up via User.findById)
-                // p.userId is the populated User object; p.userId?._id is the User ObjectId
                 const userObjId = p.userId?._id?.toString() || p.userId?.toString();
                 const displayId = userObjId || p._id?.toString() || '';
+                const techName = p.userId?.name ? `${p.userId.name} (${p.businessName || 'Technician'})` : (p.businessName || 'Verified Technician');
                 return (
-                  <option key={p._id || `prov-${idx}`} value={displayId}>
-                    {p.businessName || p.userId?.name || 'Verified Pro'} (⭐ {p.rating?.average?.toFixed(1) || '5.0'})
+                  <option key={p._id || `tech-${idx}`} value={displayId}>
+                    {techName} (⭐ {p.rating?.average?.toFixed(1) || '5.0'})
                   </option>
                 );
               })}

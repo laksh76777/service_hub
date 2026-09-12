@@ -11,7 +11,8 @@ const { WARRANTY_STATUS, WARRANTY_CLAIM_STATUS, USER_ROLES, NOTIFICATION_TYPE, B
  */
 const createWarranty = async (req, res) => {
   try {
-    const { bookingId, durationDays = 30, startDate, endDate, terms } = req.body;
+    const bookingId = req.body.bookingId || req.params.id || req.params.bookingId;
+    const { durationDays = 30, startDate, endDate, terms } = req.body;
 
     if (!bookingId) {
       return res.status(400).json({
@@ -20,7 +21,7 @@ const createWarranty = async (req, res) => {
       });
     }
 
-    const booking = await Booking.findById(bookingId);
+    const booking = await Booking.findById(bookingId).populate('serviceId');
     if (!booking) {
       return res.status(404).json({
         success: false,
@@ -28,18 +29,35 @@ const createWarranty = async (req, res) => {
       });
     }
 
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isCustomer = booking.customerId.toString() === req.user._id.toString();
+    const isProvider =
+      (booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString() ||
+      (booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString();
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isProvider && !isAdmin) {
+    if (!isCustomer && !isProvider && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Only the assigned provider or admin can assign warranty terms.'
+        message: 'Access denied: You are not authorized to create or assign warranty for this booking.'
+      });
+    }
+
+    // Check if service supports warranty
+    if (booking.serviceId && booking.serviceId.supportsWarranty === false) {
+      return res.status(400).json({
+        success: false,
+        message: 'The selected service does not support warranty coverage.'
       });
     }
 
     // Warranty can only be assigned to completed or verified work
-    const eligibleStatuses = [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.CUSTOMER_VERIFIED];
+    const eligibleStatuses = [
+      BOOKING_STATUS.COMPLETED,
+      BOOKING_STATUS.CUSTOMER_VERIFIED,
+      BOOKING_STATUS.CUSTOMER_CONFIRMED,
+      BOOKING_STATUS.INVOICED,
+      BOOKING_STATUS.WORK_COMPLETED
+    ];
     if (!eligibleStatuses.includes(booking.status)) {
       return res.status(400).json({
         success: false,
@@ -48,44 +66,67 @@ const createWarranty = async (req, res) => {
     }
 
     const start = startDate ? new Date(startDate) : new Date();
-    const days = parseInt(durationDays, 10) || 30;
+    const defaultDays = booking.serviceId?.warrantyPeriodDays || 30;
+    const days = parseInt(durationDays, 10) || defaultDays;
     const end = endDate ? new Date(endDate) : new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+    const resolvedTerms = terms || booking.serviceId?.warrantyTerms || 'Standard 30-day workmanship warranty covering repair defects.';
+    const techId = booking.technicianId || booking.providerId;
 
     let warranty = await Warranty.findOne({ bookingId: booking._id });
     if (warranty) {
       warranty.startDate = start;
       warranty.endDate = end;
       warranty.durationDays = days;
-      warranty.terms = terms || warranty.terms;
+      warranty.warrantyPeriod = `${days} days`;
+      warranty.serviceId = booking.serviceId?._id || booking.serviceId;
+      warranty.technicianId = techId;
+      warranty.providerId = techId;
+      warranty.terms = resolvedTerms;
       warranty.status = WARRANTY_STATUS.ACTIVE;
       await warranty.save();
     } else {
       warranty = await Warranty.create({
         bookingId: booking._id,
-        providerId: booking.providerId,
+        serviceId: booking.serviceId?._id || booking.serviceId,
+        technicianId: techId,
+        providerId: techId,
         customerId: booking.customerId,
         startDate: start,
         endDate: end,
         durationDays: days,
-        terms: terms || 'Standard 30-day workmanship warranty covering repair defects.',
+        warrantyPeriod: `${days} days`,
+        terms: resolvedTerms,
         status: WARRANTY_STATUS.ACTIVE
       });
     }
 
     // Notify customer about warranty activation
-    await notificationService.notify({
-      recipientId: booking.customerId,
-      senderId: req.user._id,
-      type: NOTIFICATION_TYPE.SYSTEM,
-      title: 'Warranty Activated',
-      message: `A ${days}-day service warranty has been activated for booking ${booking.bookingNumber || booking._id}.`,
-      data: { bookingId: booking._id, warrantyId: warranty._id }
-    });
+    try {
+      await notificationService.notify({
+        recipientId: booking.customerId,
+        senderId: req.user._id,
+        bookingId: booking._id,
+        type: NOTIFICATION_TYPE.WARRANTY_AVAILABLE,
+        title: 'Warranty Available',
+        message: `A ${days}-day service warranty is now available and active for booking ${booking.bookingNumber || booking._id}.`,
+        data: { bookingId: booking._id, warrantyId: warranty._id }
+      });
+    } catch (notifErr) {
+      console.warn('[WarrantyController] Notification failed:', notifErr.message);
+    }
+
+    const populated = await Warranty.findById(warranty._id)
+      .populate('serviceId', 'name slug description')
+      .populate('bookingId', 'bookingNumber status scheduledDate problemDescription')
+      .populate('technicianId', 'name fullName email phoneNumber')
+      .populate('providerId', 'name fullName email phoneNumber')
+      .populate('customerId', 'name fullName email phoneNumber');
 
     return res.status(201).json({
       success: true,
       message: 'Warranty assigned successfully.',
-      data: warranty
+      data: populated,
+      warranty: populated
     });
   } catch (error) {
     return res.status(error.status || 500).json({
@@ -101,9 +142,11 @@ const createWarranty = async (req, res) => {
  */
 const getWarrantyByBooking = async (req, res) => {
   try {
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId || req.params.id;
     const warranty = await Warranty.findOne({ bookingId })
+      .populate('serviceId', 'name slug description')
       .populate('bookingId', 'bookingNumber status scheduledDate problemDescription')
+      .populate('technicianId', 'name fullName email phoneNumber')
       .populate('providerId', 'name fullName email phoneNumber')
       .populate('customerId', 'name fullName email phoneNumber');
 
@@ -128,7 +171,8 @@ const getWarrantyByBooking = async (req, res) => {
       data: {
         warranty,
         claims
-      }
+      },
+      warranty
     });
   } catch (error) {
     return res.status(error.status || 500).json({
@@ -291,9 +335,67 @@ const updateClaimStatus = async (req, res) => {
   }
 };
 
+/**
+ * Get warranty details by ID
+ * GET /api/warranties/:id
+ */
+const getWarrantyById = async (req, res) => {
+  try {
+    const warranty = await Warranty.findById(req.params.id)
+      .populate('serviceId', 'name slug description')
+      .populate('bookingId', 'bookingNumber status scheduledDate problemDescription')
+      .populate('technicianId', 'name fullName email phoneNumber')
+      .populate('providerId', 'name fullName email phoneNumber')
+      .populate('customerId', 'name fullName email phoneNumber');
+
+    if (!warranty) {
+      return res.status(404).json({
+        success: false,
+        message: 'Warranty not found.'
+      });
+    }
+
+    const isCustomer = (warranty.customerId?._id || warranty.customerId)?.toString() === req.user._id.toString();
+    const isTech =
+      (warranty.technicianId?._id || warranty.technicianId)?.toString() === req.user._id.toString() ||
+      (warranty.providerId?._id || warranty.providerId)?.toString() === req.user._id.toString();
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+
+    if (!isCustomer && !isTech && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You do not have permission to view this warranty.'
+      });
+    }
+
+    // Auto-expire if end date passed and still active
+    if (warranty.status === WARRANTY_STATUS.ACTIVE && new Date() > new Date(warranty.endDate)) {
+      warranty.status = WARRANTY_STATUS.EXPIRED;
+      await warranty.save();
+    }
+
+    const claims = await WarrantyClaim.find({ warrantyId: warranty._id }).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        warranty,
+        claims
+      },
+      warranty
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to retrieve warranty.'
+    });
+  }
+};
+
 module.exports = {
   createWarranty,
   getWarrantyByBooking,
+  getWarrantyById,
   createWarrantyClaim,
   updateClaimStatus
 };

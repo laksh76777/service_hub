@@ -26,6 +26,8 @@ router.use('/users', userRoutes);
 router.use('/test', testAuthRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/services', serviceRoutes);
+router.use('/technicians', providerPublicRoutes);
+router.use('/technician', providerPortalRoutes);
 router.use('/providers', providerPublicRoutes);
 router.use('/provider', providerPortalRoutes);
 router.use('/admin', adminRoutes);

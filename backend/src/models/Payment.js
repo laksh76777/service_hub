@@ -22,6 +22,11 @@ const paymentSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -88,6 +93,12 @@ const paymentSchema = new mongoose.Schema(
 );
 
 paymentSchema.pre('validate', function () {
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
+
   if (!this.paymentReference) {
     this.paymentReference = this.transactionId || this.gatewayOrderId || `PAY-${Date.now()}`;
   }
@@ -95,5 +106,7 @@ paymentSchema.pre('validate', function () {
 
 paymentSchema.index({ bookingId: 1, status: 1 });
 paymentSchema.index({ customerId: 1, createdAt: -1 });
+paymentSchema.index({ technicianId: 1, createdAt: -1 });
+paymentSchema.index({ providerId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

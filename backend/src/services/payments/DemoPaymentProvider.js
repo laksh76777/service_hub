@@ -43,7 +43,7 @@ class DemoPaymentProvider extends PaymentProvider {
       return {
         success: false,
         status: 'FAILED',
-        reason: reason || 'Demo payment declined by customer simulation',
+        reason: reason || 'Demo payment declined',
         gateway: this.name
       };
     }
@@ -52,7 +52,7 @@ class DemoPaymentProvider extends PaymentProvider {
       return {
         success: false,
         status: 'CANCELLED',
-        reason: reason || 'Demo payment cancelled by customer',
+        reason: reason || 'Demo payment cancelled',
         gateway: this.name
       };
     }

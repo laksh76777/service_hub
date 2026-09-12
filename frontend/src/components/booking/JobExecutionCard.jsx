@@ -12,6 +12,8 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
   // Job notes & parts editing
   const [isEditingJob, setIsEditingJob] = useState(false);
   const [inspectionNotes, setInspectionNotes] = useState(booking.jobExecution?.inspectionNotes || '');
+  const [problemIdentified, setProblemIdentified] = useState(booking.jobExecution?.problemIdentified || '');
+  const [requiredWork, setRequiredWork] = useState(booking.jobExecution?.requiredWork || '');
   const [workNotes, setWorkNotes] = useState(booking.jobExecution?.workNotes || '');
   const [parts, setParts] = useState(
     booking.jobExecution?.partsUsed && booking.jobExecution.partsUsed.length > 0
@@ -231,10 +233,10 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
               <span>🔧</span> Job Execution & Diagnosis
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Field diagnostic notes, work carried out, and replacement parts used.
+              Field diagnostic notes, inspection findings, problem identified, and required work scope.
             </p>
           </div>
-          {(isProvider || isAdmin) && ['TECHNICIAN_ARRIVED', 'IN_PROGRESS'].includes(status) && !isEditingJob && (
+          {(isProvider || isAdmin) && ['INSPECTION', 'ESTIMATE_PENDING', 'ESTIMATE_SUBMITTED', 'WORK_IN_PROGRESS', 'TECHNICIAN_ARRIVED', 'IN_PROGRESS'].includes(status) && !isEditingJob && (
             <Button size="sm" variant="outline" onClick={() => setIsEditingJob(true)}>
               Edit Notes & Parts
             </Button>
@@ -245,15 +247,43 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
           <div className="space-y-4 pt-4">
             <div>
               <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Inspection & Diagnosis Notes
+                Inspection Notes
               </label>
               <textarea
                 rows={2}
                 value={inspectionNotes}
                 onChange={(e) => setInspectionNotes(e.target.value)}
-                placeholder="Observed low refrigerant pressure, minor gas leakage at flare joint..."
+                placeholder="Observed general wear and tear, noise during operation..."
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Problem Identified
+                </label>
+                <input
+                  type="text"
+                  value={problemIdentified}
+                  onChange={(e) => setProblemIdentified(e.target.value)}
+                  placeholder="e.g. Refrigerant leak at flare joint, faulty start capacitor"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Required Work Scope
+                </label>
+                <input
+                  type="text"
+                  value={requiredWork}
+                  onChange={(e) => setRequiredWork(e.target.value)}
+                  placeholder="e.g. Brazing joint repair, pressure testing, gas top-up"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div>
@@ -367,6 +397,24 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
                 </span>
                 <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">
                   {execution.inspectionNotes || 'No inspection notes logged yet.'}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                <span className="text-[11px] font-bold uppercase text-gray-400">
+                  Problem Identified
+                </span>
+                <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+                  {execution.problemIdentified || 'Pending diagnosis.'}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                <span className="text-[11px] font-bold uppercase text-gray-400">
+                  Required Work Scope
+                </span>
+                <p className="text-xs text-gray-700 dark:text-gray-300 mt-1">
+                  {execution.requiredWork || 'Pending scope definition.'}
                 </p>
               </div>
 

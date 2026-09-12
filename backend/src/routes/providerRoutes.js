@@ -8,10 +8,10 @@ const publicRouter = express.Router();
 publicRouter.get('/', providerController.getPublicProviders);
 publicRouter.get('/:id', providerController.getPublicProviderById);
 
-// Router for provider self-management (/api/provider)
+// Router for technician self-management (/api/technician and /api/provider)
 const portalRouter = express.Router();
 portalRouter.use(requireAuth);
-portalRouter.use(requireRole(USER_ROLES.PROVIDER, USER_ROLES.ADMIN));
+portalRouter.use(requireRole(USER_ROLES.TECHNICIAN, 'PROVIDER'));
 
 portalRouter.get('/profile', providerController.getMyProviderProfile);
 portalRouter.patch('/profile', providerController.updateMyProviderProfile);

@@ -39,7 +39,7 @@ const ServiceDetailPage = () => {
   }, [id]);
 
   if (loading) {
-    return <Loading fullPage text="Loading service details and verified pros..." />;
+    return <Loading fullPage text="Loading service details and verified technicians..." />;
   }
 
   if (error || !service) {
@@ -102,24 +102,24 @@ const ServiceDetailPage = () => {
         </div>
       </div>
 
-      {/* Verified Providers Section */}
+      {/* Eligible Technicians Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Verified Providers Offering This Service</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Eligible Technicians for {service.name}</h2>
             <p className="text-slate-500 text-xs mt-0.5">
-              Contractors verified with state licensing, active insurance, and verified customer reviews.
+              Verified local trade professionals eligible to perform this service. Choose a technician to request service.
             </p>
           </div>
           <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-            {providers.length} Verified Contractor{providers.length === 1 ? '' : 's'}
+            {providers.length} Eligible Technician{providers.length === 1 ? '' : 's'}
           </span>
         </div>
 
         {providers.length === 0 ? (
           <EmptyState
-            title="No verified contractors active in this service yet"
-            description="Service providers are currently being reviewed by our verification team. Check back soon or browse nearby categories."
+            title="No eligible technicians available for this service yet"
+            description="Technicians for this trade are currently being onboarded and verified. Please check back shortly or explore other services."
             actionLabel="Browse Other Services"
             onAction={() => window.location.assign('/services')}
           />
@@ -131,72 +131,93 @@ const ServiceDetailPage = () => {
                 title={
                   <div className="flex items-start justify-between">
                     <div>
-                      <h3 className="font-bold text-lg text-slate-900">{p.businessName}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800">
-                          ✓ Verified Pro
-                        </span>
-                        <span className="text-xs font-semibold text-slate-700">
-                          ★ {p.rating?.average ? p.rating.average.toFixed(1) : 'New'} ({p.rating?.count || 0} reviews)
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-extrabold text-lg text-slate-900">{p.name}</h3>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          ✓ {p.verificationStatus || 'Verified'}
                         </span>
                       </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                          {p.profession || 'Technician'}
+                        </span>
+                        <span className="text-xs font-medium text-slate-600">
+                          • {p.experience || `${p.experienceYears || 1} years exp`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="flex items-center gap-1 text-amber-500 font-black text-sm">
+                        <span>★</span>
+                        <span>{p.rating?.average ? Number(p.rating.average).toFixed(1) : '5.0'}</span>
+                        <span className="text-[11px] font-normal text-slate-400">({p.rating?.count || 0})</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 block">{p.completedJobsCount || 0} jobs completed</span>
                     </div>
                   </div>
                 }
                 subtitle={
-                  <span className="text-xs text-slate-500">
-                    {p.completedJobsCount} completed jobs in this region
+                  <span className="text-xs text-slate-500 font-medium">
+                    {p.businessName}
                   </span>
                 }
                 footer={
-                  <div className="flex items-center justify-between pt-1 gap-2">
-                    <span className="text-xs text-slate-500 font-medium">
-                      Coverage: {p.serviceArea?.cities?.slice(0, 2).join(', ') || 'Metro Area'}
-                    </span>
-                    <div className="flex gap-2">
-                      <Link to={`/providers/${p.id}`}>
-                        <Button size="sm" variant="outline">
-                          Profile
-                        </Button>
-                      </Link>
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() => {
-                          setTargetProvider(p);
-                          setIsBookingOpen(true);
-                        }}
-                      >
-                        Book Pro
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+                    <Link to={`/technicians/${p.id}`}>
+                      <Button size="sm" variant="outline">
+                        Technician Profile
                       </Button>
-                    </div>
+                    </Link>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                      onClick={() => {
+                        setTargetProvider(p);
+                        setIsBookingOpen(true);
+                      }}
+                    >
+                      Request Service →
+                    </Button>
                   </div>
                 }
               >
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-600 line-clamp-2">{p.bio || 'Experienced certified trade specialist.'}</p>
-
-                  {p.offering && (
-                    <div className="p-3 bg-blue-50/70 border border-blue-100 rounded-xl space-y-1 text-xs">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-slate-900">{p.offering.customTitle || service.name}</span>
-                        <span className="px-2 py-0.5 bg-blue-600 text-white rounded text-[11px] font-black uppercase tracking-wide">
-                          {p.offering.pricing?.type?.replace('_', ' ')}: ₹{p.offering.pricing?.amount}{' '}
-                          {p.offering.pricing?.currency || 'INR'}
-                        </span>
-                      </div>
-                      {p.offering.description && (
-                        <p className="text-slate-600 text-[11px]">{p.offering.description}</p>
-                      )}
-                    </div>
+                  {p.bio && (
+                    <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
+                      {p.bio}
+                    </p>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500">
-                    <span className="font-medium text-slate-700">Working Days:</span>
-                    <span>{p.availability?.days?.slice(0, 4).join(', ') || 'Mon-Fri'}</span>
+                  {/* Services Offered */}
+                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
+                      Services Provided:
+                    </span>
+                    <div className="flex flex-wrap gap-1">
+                      {(p.services || [service.name]).map((srv, idx) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200 text-[11px] font-medium"
+                        >
+                          {srv}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Availability */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-400">🕒 Availability:</span>
+                      <span className="font-semibold text-slate-700">
+                        {Array.isArray(p.availability?.days) ? p.availability.days.slice(0, 3).join(', ') : 'Mon - Sat'}
+                        {p.availability?.workingHours ? ` (${p.availability.workingHours.start} - ${p.availability.workingHours.end})` : ''}
+                      </span>
+                    </div>
                     {p.availability?.emergencyServices && (
-                      <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold">
-                        ⚡ 24/7 Emergency
+                      <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px]">
+                        ⚡ 24/7 Dispatch
                       </span>
                     )}
                   </div>

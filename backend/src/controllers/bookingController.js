@@ -2,7 +2,11 @@ const Booking = require('../models/Booking');
 const Service = require('../models/Service');
 const User = require('../models/User');
 const ProviderProfile = require('../models/ProviderProfile');
-const { BOOKING_STATUS, USER_ROLES, PROVIDER_STATUS } = require('../utils/constants');
+const Invoice = require('../models/Invoice');
+const Warranty = require('../models/Warranty');
+const Estimate = require('../models/Estimate');
+const notificationService = require('../services/notificationService');
+const { BOOKING_STATUS, USER_ROLES, PROVIDER_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
 const { validateStatusTransition, canRescheduleBooking } = require('../utils/bookingStateMachine');
 
 /**
@@ -35,27 +39,30 @@ const createBooking = async (req, res) => {
     const {
       serviceId,
       providerId,
+      technicianId,
       address,
       scheduledDate,
       preferredTimeSlot,
       problemDescription
     } = req.body;
 
+    const targetTechId = technicianId || providerId;
+
     // Validate required inputs
-    if (!serviceId || !providerId || !address || !scheduledDate || !problemDescription) {
+    if (!serviceId || !targetTechId || !address || !scheduledDate || !problemDescription) {
       return res.status(400).json({
         success: false,
-        message: 'serviceId, providerId, address, scheduledDate, and problemDescription are required.'
+        message: 'serviceId, technicianId/providerId, address, scheduledDate, and problemDescription are required.'
       });
     }
 
-    const line1 = (address.addressLine1 || address.streetAddress || '').trim();
-    const pin = (address.pincode || address.zipCode || '').trim();
+    const line1 = (address.addressLine1 || address.streetAddress || address.street || '').trim();
+    const pin = (address.pincode || address.zipCode || address.pin || '').trim();
 
     if (!line1 || !address.city || !address.state || !pin) {
       return res.status(400).json({
         success: false,
-        message: 'Complete address details (addressLine1/streetAddress, city, state, pincode/zipCode) are required.'
+        message: 'Complete address details (addressLine1/streetAddress/street, city, state, pincode/zipCode/pin) are required.'
       });
     }
 
@@ -89,27 +96,35 @@ const createBooking = async (req, res) => {
       });
     }
 
-    // Verify provider exists
-    const providerUser = await User.findById(providerId);
-    if (!providerUser || providerUser.role !== USER_ROLES.PROVIDER) {
+    // Verify technician exists
+    const targetTechnicianId = req.body.technicianId || req.body.providerId;
+    if (!targetTechnicianId) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid provider selected.'
+        message: 'Technician selection is required.'
       });
     }
 
-    // Verify provider profile is VERIFIED
-    const providerProfile = await ProviderProfile.findOne({ userId: providerId });
-    if (!providerProfile || providerProfile.status !== PROVIDER_STATUS.VERIFIED) {
+    const technicianUser = await User.findById(targetTechnicianId);
+    if (!technicianUser || (technicianUser.role !== USER_ROLES.TECHNICIAN && technicianUser.role !== 'PROVIDER')) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot book an unverified service provider. Please choose an approved verified provider.'
+        message: 'Invalid technician selected.'
+      });
+    }
+
+    // Verify technician profile is VERIFIED
+    const technicianProfile = await ProviderProfile.findOne({ userId: targetTechnicianId });
+    if (!technicianProfile || technicianProfile.status !== PROVIDER_STATUS.VERIFIED) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot book an unverified technician. Please choose an approved verified technician.'
       });
     }
 
     // Calculate baseline estimated price if available
     let estimatedTotal = service.basePrice || service.estimatedPriceRange?.min || 0;
-    const matchedOffering = providerProfile.servicesOffered?.find(
+    const matchedOffering = technicianProfile.servicesOffered?.find(
       (s) => s.serviceId.toString() === serviceId.toString() && s.isActive
     );
     if (matchedOffering?.pricing?.amount) {
@@ -141,7 +156,8 @@ const createBooking = async (req, res) => {
     const booking = new Booking({
       bookingNumber,
       customerId: req.user._id,
-      providerId,
+      technicianId: targetTechnicianId,
+      providerId: targetTechnicianId,
       serviceId,
       address: normalizedAddress,
       scheduledDate: new Date(scheduledDate),
@@ -164,6 +180,32 @@ const createBooking = async (req, res) => {
     });
 
     await booking.save();
+
+    // Notify customer: Request sent & technician: New request received
+    try {
+      await Promise.all([
+        notificationService.notify({
+          recipientId: req.user._id,
+          senderId: targetTechnicianId,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_REQUESTED,
+          title: 'Request Sent',
+          message: `Your service request for ${service.name} (${booking.bookingNumber}) has been sent to the technician.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        }),
+        notificationService.notify({
+          recipientId: targetTechnicianId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_REQUESTED,
+          title: 'New Request Received',
+          message: `You have received a new service request (${booking.bookingNumber}) for ${service.name} from ${req.user.name || 'Customer'}.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        })
+      ]);
+    } catch (notifErr) {
+      console.warn('[BookingController] createBooking notification error:', notifErr.message);
+    }
 
     const populatedBooking = await Booking.findById(booking._id)
       .populate('serviceId', 'name description basePrice')
@@ -195,11 +237,14 @@ const getBookings = async (req, res) => {
 
     if (req.user.role === USER_ROLES.CUSTOMER) {
       filter.customerId = req.user._id;
-    } else if (req.user.role === USER_ROLES.PROVIDER) {
-      filter.providerId = req.user._id;
+    } else if (req.user.role === USER_ROLES.TECHNICIAN || req.user.role === 'PROVIDER') {
+      filter.$or = [{ technicianId: req.user._id }, { providerId: req.user._id }];
     } else if (req.user.role === USER_ROLES.ADMIN) {
       if (req.query.customerId) filter.customerId = req.query.customerId;
-      if (req.query.providerId) filter.providerId = req.query.providerId;
+      if (req.query.technicianId || req.query.providerId) {
+        const tId = req.query.technicianId || req.query.providerId;
+        filter.$or = [{ technicianId: tId }, { providerId: tId }];
+      }
     }
 
     if (status && Object.values(BOOKING_STATUS).includes(status)) {
@@ -211,21 +256,39 @@ const getBookings = async (req, res) => {
     const [bookings, total] = await Promise.all([
       Booking.find(filter)
         .populate('serviceId', 'name description basePrice')
-        .populate('providerId', 'name email phone')
-        .populate('customerId', 'name email phone')
+        .populate('technicianId', 'name email phone avatarUrl')
+        .populate('providerId', 'name email phone avatarUrl')
+        .populate('customerId', 'name email phone avatarUrl')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit, 10)),
       Booking.countDocuments(filter)
     ]);
 
+    const isTechnician = req.user.role === USER_ROLES.TECHNICIAN || req.user.role === 'PROVIDER';
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+
+    const formattedBookings = bookings.map((b) => {
+      const bObj = b.toObject();
+      if (isTechnician && !isAdmin && bObj.status === BOOKING_STATUS.REQUESTED && bObj.address) {
+        bObj.address = {
+          ...bObj.address,
+          addressLine1: 'Complete address disclosed upon accepting request',
+          streetAddress: 'Complete address disclosed upon accepting request',
+          addressLine2: '',
+          unit: ''
+        };
+      }
+      return bObj;
+    });
+
     return res.status(200).json({
       success: true,
-      count: bookings.length,
+      count: formattedBookings.length,
       total,
       page: parseInt(page, 10),
       totalPages: Math.ceil(total / parseInt(limit, 10)),
-      bookings
+      bookings: formattedBookings
     });
   } catch (error) {
     console.error('Error fetching bookings:', error);
@@ -244,8 +307,9 @@ const getBookingById = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
       .populate('serviceId', 'name description basePrice')
-      .populate('providerId', 'name email phone')
-      .populate('customerId', 'name email phone')
+      .populate('technicianId', 'name email phone avatarUrl')
+      .populate('providerId', 'name email phone avatarUrl')
+      .populate('customerId', 'name email phone avatarUrl')
       .populate('statusHistory.actor.userId', 'name email role');
 
     if (!booking) {
@@ -255,12 +319,14 @@ const getBookingById = async (req, res) => {
       });
     }
 
-    // Access control: User must be customer, provider, or admin
-    const isCustomer = booking.customerId._id.toString() === req.user._id.toString();
-    const isProvider = booking.providerId._id.toString() === req.user._id.toString();
+    // Access control: User must be customer, technician, or admin
+    const isCustomer = (booking.customerId?._id || booking.customerId).toString() === req.user._id.toString();
+    const isTechnician =
+      ((booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString()) ||
+      ((booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString());
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isCustomer && !isProvider && !isAdmin) {
+    if (!isCustomer && !isTechnician && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: You do not have permission to view this booking.'
@@ -269,8 +335,20 @@ const getBookingById = async (req, res) => {
 
     const bookingObj = booking.toObject();
 
-    // Security: Unverified OTPs must NOT be exposed to the provider
-    if (isProvider && !isAdmin && !isCustomer) {
+    // Security & Location Principle:
+    // Technician receives the complete service address after accepting the request.
+    if (isTechnician && !isAdmin && !isCustomer) {
+      if (booking.status === BOOKING_STATUS.REQUESTED && bookingObj.address) {
+        bookingObj.address = {
+          ...bookingObj.address,
+          addressLine1: 'Complete address disclosed upon accepting request',
+          streetAddress: 'Complete address disclosed upon accepting request',
+          addressLine2: '',
+          unit: ''
+        };
+      }
+
+      // Security: Unverified OTPs must NOT be exposed to the technician
       if (bookingObj.startOtp && !bookingObj.startOtp.verifiedAt) {
         bookingObj.startOtp = {
           hasOtp: true,
@@ -324,11 +402,13 @@ const transitionBookingStatus = async (req, res) => {
     }
 
     // Authorization check
-    const isCustomer = booking.customerId.toString() === req.user._id.toString();
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isCustomer = (booking.customerId?._id || booking.customerId).toString() === req.user._id.toString();
+    const isTechnician =
+      ((booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString()) ||
+      ((booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString());
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isCustomer && !isProvider && !isAdmin) {
+    if (!isCustomer && !isTechnician && !isAdmin) {
       return res.status(403).json({
         success: false,
         message: 'Access denied: You are not authorized to update this booking.'
@@ -341,8 +421,27 @@ const transitionBookingStatus = async (req, res) => {
       actorRole = USER_ROLES.ADMIN;
     } else if (isCustomer) {
       actorRole = USER_ROLES.CUSTOMER;
-    } else if (isProvider) {
-      actorRole = USER_ROLES.PROVIDER;
+    } else if (isTechnician) {
+      actorRole = USER_ROLES.TECHNICIAN;
+    }
+
+    // Prevent duplicate status transitions
+    if (booking.status === nextStatus) {
+      return res.status(400).json({
+        success: false,
+        message: `Booking is already in '${booking.status}' status.`
+      });
+    }
+
+    // Reject strictly requires reason
+    if (nextStatus === BOOKING_STATUS.REJECTED) {
+      if (!reason || !reason.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'A reason is required to reject a booking request.'
+        });
+      }
+      booking.rejectionReason = reason.trim();
     }
 
     // State machine check
@@ -357,9 +456,13 @@ const transitionBookingStatus = async (req, res) => {
     booking.jobExecution = booking.jobExecution || {};
 
     // Specific state handling
-    if (nextStatus === BOOKING_STATUS.TECHNICIAN_ARRIVED) {
-      if (otp) {
-        if (booking.startOtp && booking.startOtp.code && booking.startOtp.code !== otp.trim()) {
+    if (nextStatus === BOOKING_STATUS.ACCEPTED) {
+      booking.jobExecution.acceptedAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.SCHEDULED) {
+      booking.jobExecution.scheduledAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.INSPECTION) {
+      if (otp && booking.startOtp && booking.startOtp.code) {
+        if (booking.startOtp.code !== otp.trim()) {
           booking.startOtp.attempts = (booking.startOtp.attempts || 0) + 1;
           await booking.save();
           return res.status(400).json({
@@ -367,12 +470,27 @@ const transitionBookingStatus = async (req, res) => {
             message: 'Invalid arrival OTP. Please obtain the correct 6-digit OTP from the customer.'
           });
         }
-        if (booking.startOtp) booking.startOtp.verifiedAt = new Date();
+        booking.startOtp.verifiedAt = new Date();
       }
       booking.jobExecution.technicianArrivedAt = booking.jobExecution.technicianArrivedAt || new Date();
-    } else if (nextStatus === BOOKING_STATUS.IN_PROGRESS) {
+      booking.jobExecution.inspectedAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.ESTIMATE_PENDING) {
+      booking.jobExecution.estimatePendingAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.ESTIMATE_SUBMITTED) {
+      booking.jobExecution.estimateSubmittedAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.ESTIMATE_APPROVED) {
+      booking.jobExecution.estimateApprovedAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.PAYMENT_PENDING) {
+      booking.pricing = booking.pricing || {};
+      booking.pricing.isPaid = false;
+    } else if (nextStatus === BOOKING_STATUS.PAYMENT_SUCCESS) {
+      booking.pricing = booking.pricing || {};
+      booking.pricing.isPaid = true;
+      booking.pricing.paidAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.WORK_IN_PROGRESS) {
       booking.jobExecution.workStartedAt = booking.jobExecution.workStartedAt || new Date();
-    } else if (nextStatus === BOOKING_STATUS.COMPLETION_PENDING) {
+    } else if (nextStatus === BOOKING_STATUS.WORK_COMPLETED) {
+      booking.jobExecution.workCompletedAt = new Date();
       booking.jobExecution.completionPendingAt = new Date();
       if (!booking.completionOtp || !booking.completionOtp.code) {
         booking.completionOtp = {
@@ -381,8 +499,8 @@ const transitionBookingStatus = async (req, res) => {
           attempts: 0
         };
       }
-    } else if (nextStatus === BOOKING_STATUS.CUSTOMER_VERIFIED) {
-      if (actorRole === USER_ROLES.PROVIDER && otp) {
+    } else if (nextStatus === BOOKING_STATUS.CUSTOMER_CONFIRMED) {
+      if ((actorRole === USER_ROLES.TECHNICIAN || actorRole === USER_ROLES.PROVIDER) && otp) {
         if (booking.completionOtp && booking.completionOtp.code && booking.completionOtp.code !== otp.trim()) {
           booking.completionOtp.attempts = (booking.completionOtp.attempts || 0) + 1;
           await booking.save();
@@ -395,7 +513,9 @@ const transitionBookingStatus = async (req, res) => {
       } else if (actorRole === USER_ROLES.CUSTOMER) {
         if (booking.completionOtp) booking.completionOtp.verifiedAt = new Date();
       }
-    } else if (nextStatus === BOOKING_STATUS.COMPLETED) {
+      booking.jobExecution.customerConfirmedAt = new Date();
+    } else if (nextStatus === BOOKING_STATUS.INVOICED) {
+      booking.jobExecution.invoicedAt = new Date();
       booking.jobExecution.completedAt = booking.jobExecution.completedAt || new Date();
     }
 
@@ -411,16 +531,103 @@ const transitionBookingStatus = async (req, res) => {
         role: actorRole,
         name: req.user.name || 'User'
       },
-      reason: reason ? reason.trim() : '',
+      reason: reason ? reason.trim() : (nextStatus === BOOKING_STATUS.ACCEPTED ? 'Technician accepted booking request' : ''),
       timestamp: new Date()
     });
 
     await booking.save();
 
+    // Trigger lifecycle notifications
+    try {
+      const custId = booking.customerId?._id || booking.customerId;
+      const techId = booking.technicianId?._id || booking.technicianId || booking.providerId?._id || booking.providerId;
+
+      if (nextStatus === BOOKING_STATUS.ACCEPTED) {
+        // Customer: Technician accepts
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_ACCEPTED,
+          title: 'Technician Accepts',
+          message: `Technician ${req.user.name || ''} accepted your service request ${booking.bookingNumber}.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        });
+      } else if (nextStatus === BOOKING_STATUS.REJECTED) {
+        // Customer: Technician rejects
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_REJECTED,
+          title: 'Technician Rejects',
+          message: `Your service request ${booking.bookingNumber} was declined by the technician.${booking.rejectionReason ? ` Reason: ${booking.rejectionReason}` : ''}`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber, reason: booking.rejectionReason }
+        });
+      } else if (nextStatus === BOOKING_STATUS.CANCELLED) {
+        // Technician: Customer cancels
+        await notificationService.notify({
+          recipientId: techId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_CANCELLED,
+          title: 'Customer Cancels',
+          message: `Customer cancelled service booking ${booking.bookingNumber}.${reason ? ` Reason: ${reason}` : ''}`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber, reason }
+        });
+      } else if (nextStatus === BOOKING_STATUS.WORK_IN_PROGRESS) {
+        // Customer: Work started
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.WORK_STARTED,
+          title: 'Work Started',
+          message: `Technician has started work on your service booking ${booking.bookingNumber}.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        });
+      } else if (nextStatus === BOOKING_STATUS.WORK_COMPLETED) {
+        // Customer: Work completed
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.WORK_COMPLETED,
+          title: 'Work Completed',
+          message: `Technician completed work on booking ${booking.bookingNumber}. Please inspect and confirm completion.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        });
+      } else if (nextStatus === BOOKING_STATUS.CUSTOMER_CONFIRMED) {
+        // Technician: Customer confirms completion
+        await notificationService.notify({
+          recipientId: techId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.CUSTOMER_CONFIRMED,
+          title: 'Customer Confirms Completion',
+          message: `Customer has confirmed service completion for booking ${booking.bookingNumber}.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        });
+        // Customer: Review requested
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: techId,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.REVIEW_REQUESTED,
+          title: 'Review Requested',
+          message: `Your service for booking ${booking.bookingNumber} is complete! Please rate and review your technician.`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber }
+        });
+      }
+    } catch (notifErr) {
+      console.warn('[BookingController] Lifecycle notification failed:', notifErr.message);
+    }
+
     const updatedBooking = await Booking.findById(booking._id)
       .populate('serviceId', 'name description basePrice')
-      .populate('providerId', 'name email phone')
-      .populate('customerId', 'name email phone');
+      .populate('technicianId', 'name email phone avatarUrl')
+      .populate('providerId', 'name email phone avatarUrl')
+      .populate('customerId', 'name email phone avatarUrl');
 
     return res.status(200).json({
       success: true,
@@ -518,6 +725,40 @@ const rescheduleBooking = async (req, res) => {
 
     await booking.save();
 
+    // Job schedule changes notification
+    try {
+      const custId = booking.customerId?._id || booking.customerId;
+      const techId = booking.technicianId?._id || booking.technicianId || booking.providerId?._id || booking.providerId;
+      const formattedDate = new Date(newScheduledDate).toLocaleDateString('en-IN');
+      const timeSlotStr = newTimeSlot || booking.preferredTimeSlot;
+
+      if (isCustomer) {
+        // Notify technician: Job schedule changes
+        await notificationService.notify({
+          recipientId: techId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_RESCHEDULED,
+          title: 'Job Schedule Changes',
+          message: `Customer rescheduled booking ${booking.bookingNumber} to ${formattedDate} (${timeSlotStr}).${reason ? ` Reason: ${reason}` : ''}`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber, newScheduledDate, newTimeSlot: timeSlotStr }
+        });
+      } else {
+        // Notify customer: Job schedule changes
+        await notificationService.notify({
+          recipientId: custId,
+          senderId: req.user._id,
+          bookingId: booking._id,
+          type: NOTIFICATION_TYPE.BOOKING_RESCHEDULED,
+          title: 'Job Schedule Changes',
+          message: `Technician updated appointment for booking ${booking.bookingNumber} to ${formattedDate} (${timeSlotStr}).${reason ? ` Reason: ${reason}` : ''}`,
+          data: { bookingId: booking._id, bookingNumber: booking.bookingNumber, newScheduledDate, newTimeSlot: timeSlotStr }
+        });
+      }
+    } catch (notifErr) {
+      console.warn('[BookingController] Reschedule notification failed:', notifErr.message);
+    }
+
     const updatedBooking = await Booking.findById(booking._id)
       .populate('serviceId', 'name description basePrice')
       .populate('providerId', 'name email phone')
@@ -560,13 +801,15 @@ const verifyBookingOtp = async (req, res) => {
       });
     }
 
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isTechnician =
+      (booking.technicianId && booking.technicianId.toString() === req.user._id.toString()) ||
+      (booking.providerId && booking.providerId.toString() === req.user._id.toString());
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isProvider && !isAdmin) {
+    if (!isTechnician && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Only the assigned provider or admin can verify customer OTP.'
+        message: 'Access denied: Only the assigned technician or admin can verify customer OTP.'
       });
     }
 
@@ -700,7 +943,13 @@ const verifyBookingOtp = async (req, res) => {
  */
 const updateJobExecution = async (req, res) => {
   try {
-    const { inspectionNotes, workNotes, partsUsed } = req.body;
+    const {
+      inspectionNotes,
+      problemIdentified,
+      requiredWork,
+      workNotes,
+      partsUsed
+    } = req.body;
 
     const booking = await Booking.findById(req.params.id);
     if (!booking) {
@@ -710,13 +959,15 @@ const updateJobExecution = async (req, res) => {
       });
     }
 
-    const isProvider = booking.providerId.toString() === req.user._id.toString();
+    const isTechnician =
+      ((booking.technicianId?._id || booking.technicianId)?.toString() === req.user._id.toString()) ||
+      ((booking.providerId?._id || booking.providerId)?.toString() === req.user._id.toString());
     const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    if (!isProvider && !isAdmin) {
+    if (!isTechnician && !isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: Only the assigned provider or admin can update job execution details.'
+        message: 'Access denied: Only the assigned technician or admin can update job execution details.'
       });
     }
 
@@ -725,24 +976,30 @@ const updateJobExecution = async (req, res) => {
     if (inspectionNotes !== undefined) {
       booking.jobExecution.inspectionNotes = inspectionNotes.trim();
     }
+    if (problemIdentified !== undefined) {
+      booking.jobExecution.problemIdentified = problemIdentified.trim();
+    }
+    if (requiredWork !== undefined) {
+      booking.jobExecution.requiredWork = requiredWork.trim();
+    }
     if (workNotes !== undefined) {
       booking.jobExecution.workNotes = workNotes.trim();
     }
     if (Array.isArray(partsUsed)) {
       booking.jobExecution.partsUsed = partsUsed.map((p) => ({
-        name: (p.name || 'Part/Consumable').trim(),
+        name: (p.name || p.description || 'Part/Consumable').trim(),
         quantity: Math.max(1, parseInt(p.quantity, 10) || 1),
-        cost: Math.max(0, parseFloat(p.cost) || 0)
+        cost: Math.max(0, parseFloat(p.cost || p.unitPrice) || 0)
       }));
-
-      // Update pricing final total with parts cost
-      const partsTotal = booking.jobExecution.partsUsed.reduce(
-        (sum, p) => sum + p.cost * p.quantity,
-        0
-      );
-      const basePrice = booking.pricing?.estimatedTotal || 0;
-      booking.pricing.finalTotal = basePrice + partsTotal;
     }
+
+    if (booking.status === BOOKING_STATUS.INSPECTION) {
+      booking.jobExecution.inspectedAt = booking.jobExecution.inspectedAt || new Date();
+    }
+
+    // CRITICAL SECURITY RULE:
+    // Do not allow technician to directly charge the customer from inspection/job updates.
+    // Financial charges must only be proposed via an Estimate requiring customer approval.
 
     await booking.save();
 
@@ -770,6 +1027,7 @@ module.exports = {
   getBookings,
   getBookingById,
   transitionBookingStatus,
+  updateBookingStatus: transitionBookingStatus,
   rescheduleBooking,
   verifyBookingOtp,
   updateJobExecution

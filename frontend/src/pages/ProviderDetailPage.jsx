@@ -27,7 +27,7 @@ const ProviderDetailPage = () => {
           setProvider(res.data.provider);
         }
       } catch (err) {
-        setError(err.message || 'Failed to load provider profile');
+        setError(err.message || 'Failed to load technician profile');
       } finally {
         setLoading(false);
       }
@@ -44,10 +44,10 @@ const ProviderDetailPage = () => {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16">
         <EmptyState
-          title="Provider Profile Unavailable"
-          description={error || 'This provider profile is either not verified or does not exist.'}
+          title="Technician Profile Unavailable"
+          description={error || 'This technician profile is either not verified or does not exist.'}
           actionLabel="Back to Directory"
-          onAction={() => window.location.assign('/providers')}
+          onAction={() => window.location.assign('/technicians')}
         />
       </div>
     );
@@ -57,9 +57,9 @@ const ProviderDetailPage = () => {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-xs text-slate-500 mb-6">
-        <Link to="/providers" className="hover:text-blue-600 transition-colors">Providers</Link>
+        <Link to="/technicians" className="hover:text-blue-600 transition-colors">Technicians</Link>
         <span>/</span>
-        <span className="text-slate-900 font-semibold">{provider.businessName}</span>
+        <span className="text-slate-900 font-semibold">{provider.user?.name || provider.businessName}</span>
       </nav>
 
       {/* Profile Header Card */}
@@ -68,7 +68,7 @@ const ProviderDetailPage = () => {
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                <span>✓</span> Verified Contractor
+                <span>✓</span> Verified Technician
               </span>
               {provider.licenseNumber && (
                 <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
@@ -78,11 +78,14 @@ const ProviderDetailPage = () => {
             </div>
 
             <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              {provider.businessName}
+              {provider.user?.name || provider.businessName}
             </h1>
+            {provider.businessName && provider.user?.name && (
+              <p className="text-sm font-bold text-blue-600">{provider.businessName}</p>
+            )}
 
             <p className="text-sm text-slate-600 max-w-3xl leading-relaxed">
-              {provider.bio || 'Certified trade professional dedicated to high quality residential and commercial work.'}
+              {provider.bio || 'Certified trade professional dedicated to high quality residential work.'}
             </p>
           </div>
 
@@ -112,25 +115,25 @@ const ProviderDetailPage = () => {
             <Button
               size="sm"
               variant="primary"
-              className="w-full font-bold"
+              className="w-full font-bold bg-blue-600 hover:bg-blue-700 text-white"
               onClick={() => {
                 setTargetService(provider.services?.[0]?.serviceId || null);
                 setIsBookingOpen(true);
               }}
             >
-              Book Service With Pro
+              Request Service
             </Button>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Services & Pricing Catalog */}
+        {/* Left 2 Cols: Technician Services & Pricing Catalog */}
         <div className="lg:col-span-2 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold text-slate-900">Services & Pricing Catalog</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Technician Services &amp; Pricing</h2>
             <p className="text-xs text-slate-500 mt-1">
-              Custom service rates configured directly by {provider.businessName}.
+              Custom service rates configured directly by {provider.user?.name || provider.businessName}.
             </p>
           </div>
 
@@ -193,7 +196,7 @@ const ProviderDetailPage = () => {
                           setIsBookingOpen(true);
                         }}
                       >
-                        Book Service
+                        Request Service
                       </Button>
                     </div>
                   </div>

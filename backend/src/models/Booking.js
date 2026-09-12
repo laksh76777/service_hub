@@ -86,6 +86,11 @@ const bookingSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -167,6 +172,11 @@ const bookingSchema = new mongoose.Schema(
       default: BOOKING_STATUS.REQUESTED,
       index: true
     },
+    rejectionReason: {
+      type: String,
+      trim: true,
+      default: ''
+    },
     pricing: {
       estimatedTotal: { type: Number, default: 0 },
       finalTotal: { type: Number, default: 0 },
@@ -188,6 +198,8 @@ const bookingSchema = new mongoose.Schema(
     },
     jobExecution: {
       inspectionNotes: { type: String, trim: true, default: '' },
+      problemIdentified: { type: String, trim: true, default: '' },
+      requiredWork: { type: String, trim: true, default: '' },
       workNotes: { type: String, trim: true, default: '' },
       partsUsed: [
         {
@@ -197,9 +209,17 @@ const bookingSchema = new mongoose.Schema(
         }
       ],
       technicianArrivedAt: { type: Date },
+      scheduledAt: { type: Date },
+      inspectedAt: { type: Date },
+      estimatePendingAt: { type: Date },
+      estimateSubmittedAt: { type: Date },
+      estimateApprovedAt: { type: Date },
       workStartedAt: { type: Date },
+      workCompletedAt: { type: Date },
       completionPendingAt: { type: Date },
-      completedAt: { type: Date }
+      customerConfirmedAt: { type: Date },
+      completedAt: { type: Date },
+      invoicedAt: { type: Date }
     },
     statusHistory: [statusHistorySchema],
     rescheduleHistory: [rescheduleSchema]
@@ -238,12 +258,21 @@ bookingSchema.pre('validate', function () {
       this.address.zipCode = this.address.pincode;
     }
   }
+
+  // Synchronize technicianId and providerId
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
 });
 
 bookingSchema.index({ customerId: 1, status: 1 });
 bookingSchema.index({ providerId: 1, status: 1 });
+bookingSchema.index({ technicianId: 1, status: 1 });
 bookingSchema.index({ scheduledDate: 1, status: 1 });
 bookingSchema.index({ customerId: 1, createdAt: -1 });
 bookingSchema.index({ providerId: 1, createdAt: -1 });
+bookingSchema.index({ technicianId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Booking', bookingSchema);

@@ -69,6 +69,21 @@ const disputeSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
+    providerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
+      index: true
+    },
     reason: {
       type: String,
       enum: Object.values(DISPUTE_REASON),
@@ -91,12 +106,34 @@ const disputeSchema = new mongoose.Schema(
       default: DISPUTE_STATUS.OPEN,
       index: true
     },
+    technicianResponse: {
+      message: {
+        type: String,
+        trim: true
+      },
+      respondedAt: {
+        type: Date
+      }
+    },
     providerResponse: {
       message: {
         type: String,
         trim: true
       },
       respondedAt: {
+        type: Date
+      }
+    },
+    adminReview: {
+      reviewedById: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      notes: {
+        type: String,
+        trim: true
+      },
+      reviewedAt: {
         type: Date
       }
     },
@@ -130,9 +167,30 @@ disputeSchema.pre('validate', function () {
     const random = Math.floor(1000 + Math.random() * 9000);
     this.disputeNumber = `DSP-${timestamp}-${random}`;
   }
+
+  if (this.againstId && !this.technicianId) {
+    this.technicianId = this.againstId;
+  }
+  if (this.againstId && !this.providerId) {
+    this.providerId = this.againstId;
+  }
+
+  if (this.technicianResponse?.message && !this.providerResponse?.message) {
+    this.providerResponse = {
+      message: this.technicianResponse.message,
+      respondedAt: this.technicianResponse.respondedAt || new Date()
+    };
+  } else if (this.providerResponse?.message && !this.technicianResponse?.message) {
+    this.technicianResponse = {
+      message: this.providerResponse.message,
+      respondedAt: this.providerResponse.respondedAt || new Date()
+    };
+  }
 });
 
 disputeSchema.index({ bookingId: 1, status: 1 });
+disputeSchema.index({ serviceId: 1 });
+disputeSchema.index({ technicianId: 1 });
 disputeSchema.index({ raisedById: 1, status: 1 });
 disputeSchema.index({ againstId: 1, status: 1 });
 

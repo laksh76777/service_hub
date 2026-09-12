@@ -56,8 +56,11 @@ const NotificationBell = () => {
     }
 
     setIsOpen(false);
-    if (notif.data?.bookingId) {
-      navigate(`/bookings/${notif.data.bookingId}`);
+    const targetBookingId = notif.bookingId?._id || notif.bookingId || notif.data?.bookingId;
+    if (targetBookingId) {
+      navigate(`/bookings/${targetBookingId}`);
+    } else if (notif.data?.link) {
+      navigate(notif.data.link);
     }
   };
 
@@ -145,6 +148,18 @@ const NotificationBell = () => {
                 </div>
               ))
             )}
+          </div>
+
+          <div className="p-2.5 border-t border-slate-100 text-center bg-slate-50/70 rounded-b-2xl">
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                navigate('/notifications');
+              }}
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              View all notifications &rarr;
+            </button>
           </div>
         </div>
       )}

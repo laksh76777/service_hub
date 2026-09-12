@@ -100,30 +100,57 @@ const getServiceById = async (req, res) => {
       });
     }
 
-    // Security rule: Only return VERIFIED providers to customers
+    // Security & Eligibility: Only VERIFIED active technicians who offer this service
     const verifiedProviders = await ProviderProfile.find({
       status: PROVIDER_STATUS.VERIFIED,
-      'servicesOffered.serviceId': service._id,
-      'servicesOffered.isActive': true
+      $or: [
+        { 'servicesOffered.serviceId': service._id, 'servicesOffered.isActive': true },
+        { categories: service.categoryId }
+      ]
     })
-      .populate('userId', 'name email phone avatarUrl')
-      .select('businessName bio rating completedJobsCount serviceArea availability servicesOffered status')
+      .populate('userId', 'name email phone avatarUrl role status')
       .lean();
 
-    // Extract the specific offering data for this service from each provider
-    const formattedProviders = verifiedProviders.map((p) => {
-      const offering = p.servicesOffered.find(
-        (so) => so.serviceId.toString() === service._id.toString()
+    // Strictly exclude Admin and Customer accounts; ensure active status
+    const eligibleTechnicians = verifiedProviders.filter((p) => {
+      const u = p.userId;
+      if (!u) return false;
+      if (u.role === 'ADMIN' || u.role === 'CUSTOMER') return false;
+      if (u.role !== 'TECHNICIAN' && u.role !== 'PROVIDER') return false;
+      if (u.status && u.status !== 'ACTIVE') return false;
+      return true;
+    });
+
+    // Format technician cards with all required display fields
+    const formattedTechnicians = eligibleTechnicians.map((p) => {
+      const offering = (p.servicesOffered || []).find(
+        (so) => so.serviceId?.toString() === service._id.toString()
       );
+
+      const servicesList = (p.servicesOffered || [])
+        .filter((s) => s.isActive)
+        .map((s) => s.customTitle || s.serviceId?.name || service.name);
+
       return {
         id: p._id,
+        name: p.userId?.name || p.businessName,
         businessName: p.businessName,
+        profession: p.profession || 'General Service Technician',
+        experience: p.experience || `${p.experienceYears || 1} years`,
+        experienceYears: p.experienceYears || 1,
         bio: p.bio,
-        rating: p.rating,
-        completedJobsCount: p.completedJobsCount,
-        serviceArea: p.serviceArea,
-        availability: p.availability,
-        offering: offering || null
+        rating: p.rating || { average: 5.0, count: 0 },
+        completedJobsCount: p.completedJobsCount || 0,
+        services: servicesList.length > 0 ? servicesList : [service.name],
+        availability: {
+          days: p.availability?.days || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+          workingHours: p.availability?.workingHours || { start: '08:00', end: '20:00' },
+          emergencyServices: !!p.availability?.emergencyServices
+        },
+        verificationStatus: p.status || 'VERIFIED',
+        status: p.status || 'VERIFIED',
+        offering: offering || null,
+        user: p.userId
       };
     });
 
@@ -131,8 +158,10 @@ const getServiceById = async (req, res) => {
       success: true,
       data: {
         service,
-        providers: formattedProviders,
-        providersCount: formattedProviders.length
+        technicians: formattedTechnicians,
+        providers: formattedTechnicians,
+        techniciansCount: formattedTechnicians.length,
+        providersCount: formattedTechnicians.length
       }
     });
   } catch (error) {

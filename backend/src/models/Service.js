@@ -30,6 +30,18 @@ const serviceSchema = new mongoose.Schema(
       max: { type: Number, default: 0 },
       currency: { type: String, default: 'INR' }
     },
+    supportsWarranty: {
+      type: Boolean,
+      default: true
+    },
+    warrantyPeriodDays: {
+      type: Number,
+      default: 30
+    },
+    warrantyTerms: {
+      type: String,
+      default: 'Standard 30-day workmanship warranty covering repair defects.'
+    },
     status: {
       type: String,
       enum: Object.values(SERVICE_STATUS),

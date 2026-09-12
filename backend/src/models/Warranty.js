@@ -23,15 +23,29 @@ const warrantySchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      index: true
+    },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
       index: true
     },
     durationDays: {
       type: Number,
       default: 30
+    },
+    warrantyPeriod: {
+      type: String,
+      default: '30 days',
+      trim: true
     },
     startDate: {
       type: Date,
@@ -60,6 +74,16 @@ const warrantySchema = new mongoose.Schema(
 );
 
 warrantySchema.pre('validate', function () {
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
+
+  if (!this.warrantyPeriod) {
+    this.warrantyPeriod = `${this.durationDays || 30} days`;
+  }
+
   if (!this.warrantyCode) {
     const timestamp = Date.now().toString().slice(-4);
     const random = Math.floor(1000 + Math.random() * 9000);
@@ -67,7 +91,10 @@ warrantySchema.pre('validate', function () {
   }
 });
 
+warrantySchema.index({ serviceId: 1 });
 warrantySchema.index({ customerId: 1, status: 1 });
+warrantySchema.index({ providerId: 1, status: 1 });
+warrantySchema.index({ technicianId: 1, status: 1 });
 warrantySchema.index({ endDate: 1, status: 1 });
 
 module.exports = mongoose.model('Warranty', warrantySchema);

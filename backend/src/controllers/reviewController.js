@@ -11,7 +11,8 @@ const { BOOKING_STATUS, NOTIFICATION_TYPE } = require('../utils/constants');
  */
 const createReview = async (req, res) => {
   try {
-    const { bookingId, rating, comment } = req.body;
+    const { bookingId, rating, review: reviewText, comment } = req.body;
+    const finalComment = (reviewText || comment || '').trim();
 
     if (!bookingId || rating === undefined || rating === null) {
       return res.status(400).json({
@@ -21,10 +22,10 @@ const createReview = async (req, res) => {
     }
 
     const numRating = Number(rating);
-    if (isNaN(numRating) || numRating < 1 || numRating > 5) {
+    if (!Number.isInteger(numRating) || numRating < 1 || numRating > 5) {
       return res.status(400).json({
         success: false,
-        message: 'Rating must be a numeric value between 1 and 5.'
+        message: 'Rating must be an integer between 1 and 5.'
       });
     }
 
@@ -36,54 +37,72 @@ const createReview = async (req, res) => {
       });
     }
 
-    // 1. Enforce: Only customers with completed bookings can review
-    if (booking.status !== BOOKING_STATUS.COMPLETED) {
-      return res.status(400).json({
+    // 1. Enforce: Only customer of this booking can review
+    if ((booking.customerId?._id || booking.customerId)?.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
         success: false,
-        message: `Reviews can only be submitted for COMPLETED bookings. Current status is ${booking.status}.`
+        message: 'Access denied: Customer can only review own completed booking.'
       });
     }
 
-    // 2. Enforce: Prevent arbitrary review ownership (must be the booking's customer)
-    if (booking.customerId.toString() !== req.user._id.toString()) {
-      return res.status(403).json({
+    // 2. Enforce: Review permitted only after completion/customer confirmation
+    const eligibleStatuses = [
+      BOOKING_STATUS.CUSTOMER_CONFIRMED,
+      BOOKING_STATUS.WORK_COMPLETED,
+      BOOKING_STATUS.INVOICED,
+      BOOKING_STATUS.COMPLETED
+    ];
+
+    if (!eligibleStatuses.includes(booking.status)) {
+      return res.status(400).json({
         success: false,
-        message: 'Access denied: Only the customer who booked this service can submit a review.'
+        message: `Reviews can only be submitted for completed or customer-confirmed bookings. Current status: ${booking.status}`
       });
     }
 
     // 3. Enforce: Prevent providers reviewing themselves
-    if (booking.providerId.toString() === req.user._id.toString()) {
+    const techId = booking.technicianId?._id || booking.technicianId || booking.providerId?._id || booking.providerId;
+    if (techId?.toString() === req.user._id.toString()) {
       return res.status(400).json({
         success: false,
-        message: 'Providers are strictly prohibited from reviewing themselves.'
+        message: 'Technicians are strictly prohibited from reviewing themselves.'
       });
     }
 
-    // 4. Enforce: Prevent duplicate reviews for the same booking
+    // 4. Enforce: Exactly one review per completed booking
     const existingReview = await Review.findOne({ bookingId: booking._id });
     if (existingReview) {
       return res.status(400).json({
         success: false,
-        message: 'A review has already been submitted for this booking.'
+        message: 'Only one review per completed booking is allowed. A review already exists for this booking.'
       });
     }
 
     const review = await Review.create({
       bookingId: booking._id,
       customerId: req.user._id,
-      providerId: booking.providerId,
+      technicianId: techId,
+      providerId: techId,
+      serviceId: booking.serviceId?._id || booking.serviceId,
       rating: numRating,
-      comment: comment?.trim() || '',
+      comment: finalComment,
+      review: finalComment,
       verifiedWork: true
     });
 
-    // 5. Calculate provider rating efficiently via aggregation and update ProviderProfile
+    // 5. Update technician rating on ProviderProfile from all valid reviews
     const stats = await Review.aggregate([
-      { $match: { providerId: booking.providerId } },
+      {
+        $match: {
+          $or: [
+            { technicianId: techId },
+            { providerId: techId }
+          ]
+        }
+      },
       {
         $group: {
-          _id: '$providerId',
+          _id: null,
           avgRating: { $avg: '$rating' },
           count: { $sum: 1 }
         }
@@ -95,7 +114,7 @@ const createReview = async (req, res) => {
       const count = stats[0].count;
 
       await ProviderProfile.findOneAndUpdate(
-        { userId: booking.providerId },
+        { userId: techId },
         {
           'rating.average': average,
           'rating.count': count
@@ -103,20 +122,33 @@ const createReview = async (req, res) => {
       );
     }
 
-    // Notify provider of new review
-    await notificationService.notify({
-      recipientId: booking.providerId,
-      senderId: req.user._id,
-      type: NOTIFICATION_TYPE.SYSTEM,
-      title: `New Verified Review: ${numRating} ★`,
-      message: `A customer rated your service ${numRating} out of 5 stars.${comment ? ` Feedback: "${comment}"` : ''}`,
-      data: { reviewId: review._id, bookingId: booking._id }
-    });
+    // Notify technician of new review
+    try {
+      await notificationService.notify({
+        recipientId: techId,
+        senderId: req.user._id,
+        bookingId: booking._id,
+        type: NOTIFICATION_TYPE.SYSTEM,
+        title: `New Verified Review: ${numRating} ★`,
+        message: `Customer rated your service ${numRating} out of 5 stars.${finalComment ? ` Feedback: "${finalComment}"` : ''}`,
+        data: { reviewId: review._id, bookingId: booking._id, rating: numRating }
+      });
+    } catch (notifErr) {
+      console.warn('[ReviewController] Notification failed:', notifErr.message);
+    }
+
+    const populated = await Review.findById(review._id)
+      .populate('customerId', 'name fullName email')
+      .populate('technicianId', 'name fullName email')
+      .populate('providerId', 'name fullName email')
+      .populate('serviceId', 'name slug')
+      .populate('bookingId', 'bookingNumber status scheduledDate');
 
     return res.status(201).json({
       success: true,
-      message: 'Review submitted successfully. Provider rating has been updated.',
-      data: review
+      message: 'Review submitted successfully. Technician rating has been updated.',
+      data: populated,
+      review: populated
     });
   } catch (error) {
     return res.status(error.status || 500).json({
@@ -132,10 +164,13 @@ const createReview = async (req, res) => {
  */
 const getReviewByBooking = async (req, res) => {
   try {
-    const { bookingId } = req.params;
+    const bookingId = req.params.bookingId || req.params.id;
     const review = await Review.findOne({ bookingId })
-      .populate('customerId', 'name fullName')
-      .populate('providerId', 'name fullName');
+      .populate('customerId', 'name fullName email')
+      .populate('technicianId', 'name fullName email')
+      .populate('providerId', 'name fullName email')
+      .populate('serviceId', 'name slug')
+      .populate('bookingId', 'bookingNumber status scheduledDate');
 
     if (!review) {
       return res.status(404).json({

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -9,18 +9,26 @@ import BookingModal from '../components/booking/BookingModal';
 import { useAuth } from '../context/AuthContext';
 import { updateMe, getBookings } from '../services/api';
 
-const DashboardPage = () => {
+const DashboardPage = ({ initialTab = 'bookings' }) => {
   const { user, mongoUser, isEmailVerified, resendVerificationEmail, refreshUserProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
 
-  // Role guard: PROVIDER and ADMIN must use the Provider Cockpit
+  // Role guard: TECHNICIAN must use the Technician Portal
   useEffect(() => {
-    if (mongoUser?.role === 'PROVIDER' || mongoUser?.role === 'ADMIN') {
-      navigate('/provider/dashboard', { replace: true });
+    if (mongoUser?.role === 'TECHNICIAN' || mongoUser?.role === 'PROVIDER') {
+      navigate('/technician/dashboard', { replace: true });
     }
   }, [mongoUser, navigate]);
 
-  const [activeTab, setActiveTab] = useState('bookings');
+  const [activeTab, setActiveTab] = useState(urlTab || initialTab);
+
+  useEffect(() => {
+    if (urlTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [inspectBooking, setInspectBooking] = useState(null);

@@ -44,6 +44,7 @@ class PaymentService {
 
     const booking = await Booking.findById(bookingId)
       .populate('serviceId', 'name basePrice')
+      .populate('technicianId', 'name email phone')
       .populate('providerId', 'name email phone');
 
     if (!booking) {
@@ -52,7 +53,15 @@ class PaymentService {
       throw err;
     }
 
-    if (!customerId || booking.customerId.toString() !== customerId.toString()) {
+    const requestingRole = maybeUser?.role;
+    if (requestingRole === USER_ROLES.TECHNICIAN || requestingRole === 'PROVIDER') {
+      const err = new Error('Access denied: Technicians cannot create payment orders.');
+      err.status = 403;
+      throw err;
+    }
+
+    const bookingCustId = (booking.customerId?._id || booking.customerId)?.toString();
+    if (!customerId || bookingCustId !== customerId.toString()) {
       const err = new Error('Access denied: You are not authorized to make payments for this booking.');
       err.status = 403;
       throw err;
@@ -66,6 +75,21 @@ class PaymentService {
 
     if (existingSuccessPayment) {
       const err = new Error('This booking has already been paid successfully.');
+      err.status = 400;
+      throw err;
+    }
+
+    // Disallow payment if booking is not in a payable state (e.g. estimate rejected or pending)
+    const payableStatuses = [
+      BOOKING_STATUS.PAYMENT_PENDING,
+      BOOKING_STATUS.ESTIMATE_APPROVED,
+      BOOKING_STATUS.CUSTOMER_CONFIRMED,
+      BOOKING_STATUS.WORK_COMPLETED,
+      BOOKING_STATUS.INVOICED
+    ];
+
+    if (!payableStatuses.includes(booking.status)) {
+      const err = new Error(`Payment cannot be initiated for booking in '${booking.status}' status. An estimate must be approved first.`);
       err.status = 400;
       throw err;
     }
@@ -89,8 +113,8 @@ class PaymentService {
       if (approvedEstimates.length > 0) {
         payableAmount = approvedEstimates.reduce((sum, est) => sum + est.total, 0);
       } else {
-        // Fallback to booking pricing
-        payableAmount = booking.pricing?.finalTotal || booking.pricing?.estimatedTotal || 0;
+        // Fallback only to confirmed booking pricing finalTotal
+        payableAmount = booking.pricing?.finalTotal || 0;
       }
     }
 
@@ -113,6 +137,8 @@ class PaymentService {
       }
     });
 
+    const technicianId = booking.technicianId?._id || booking.technicianId || booking.providerId?._id || booking.providerId;
+
     // Save or update pending payment record in DB
     let payment = await Payment.findOne({
       bookingId: booking._id,
@@ -121,16 +147,20 @@ class PaymentService {
 
     if (payment) {
       payment.amount = payableAmount;
+      payment.currency = 'INR';
       payment.gateway = orderData.gateway;
       payment.gatewayOrderId = orderData.orderId;
       payment.status = PAYMENT_STATUS.PENDING;
+      payment.technicianId = technicianId;
+      payment.providerId = technicianId;
       payment.invoiceId = associatedInvoice?._id || payment.invoiceId;
       await payment.save();
     } else {
       payment = await Payment.create({
         bookingId: booking._id,
         customerId: booking.customerId,
-        providerId: booking.providerId?._id || booking.providerId,
+        technicianId,
+        providerId: technicianId,
         invoiceId: associatedInvoice?._id,
         amount: payableAmount,
         currency: 'INR',
@@ -149,6 +179,7 @@ class PaymentService {
       gateway: orderData.gateway,
       bookingNumber: booking.bookingNumber,
       serviceName: booking.serviceId?.name || 'Home Service',
+      technicianName: booking.technicianId?.name || booking.providerId?.name || 'Assigned Technician',
       invoiceNumber: associatedInvoice?.invoiceNumber || null
     };
   }
@@ -161,6 +192,14 @@ class PaymentService {
     const { paymentId, outcome, failureReason } = params;
     const simulateOutcome = params.simulateOutcome || outcome || 'SUCCESS';
     const customerId = params.customerId || params.user?._id;
+    const userRole = params.user?.role;
+
+    // Strict RBAC: Technicians cannot modify or execute payment statuses
+    if (userRole === USER_ROLES.TECHNICIAN || userRole === 'PROVIDER') {
+      const err = new Error('Access denied: Technicians are not permitted to modify or complete payments.');
+      err.status = 403;
+      throw err;
+    }
 
     const payment = await Payment.findById(paymentId);
     if (!payment) {
@@ -169,14 +208,37 @@ class PaymentService {
       throw err;
     }
 
-    if (customerId && payment.customerId.toString() !== customerId.toString()) {
+    const isAdmin = userRole === USER_ROLES.ADMIN;
+    const paymentCustId = (payment.customerId?._id || payment.customerId)?.toString();
+    if (!isAdmin && customerId && paymentCustId !== customerId.toString()) {
       const err = new Error('Access denied: You are not authorized to modify this payment.');
       err.status = 403;
       throw err;
     }
 
+    const booking = await Booking.findById(payment.bookingId);
+    if (!booking) {
+      const err = new Error('Associated booking not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    const bookingCustId = (booking.customerId?._id || booking.customerId)?.toString();
+    if (!isAdmin && customerId && bookingCustId !== customerId.toString()) {
+      const err = new Error('Access denied: You do not own the booking for this payment.');
+      err.status = 403;
+      throw err;
+    }
+
+    // Amount verification: Must be positive valid amount
+    if (!payment.amount || payment.amount <= 0) {
+      const err = new Error('Invalid payment amount.');
+      err.status = 400;
+      throw err;
+    }
+
     // DUPLICATE PAYMENT PROTECTION:
-    // If payment is already SUCCESS, return idempotently without duplicate side effects
+    // If this payment is already SUCCESS, return idempotently without duplicate side effects
     if (payment.status === PAYMENT_STATUS.SUCCESS) {
       return {
         success: true,
@@ -192,10 +254,24 @@ class PaymentService {
       throw err;
     }
 
+    // Prevent duplicate successful payments across any other payment record for this booking
+    const existingSuccessPayment = await Payment.findOne({
+      bookingId: payment.bookingId,
+      status: PAYMENT_STATUS.SUCCESS,
+      _id: { $ne: payment._id }
+    });
+
+    if (existingSuccessPayment) {
+      const err = new Error('This booking has already been paid successfully.');
+      err.status = 400;
+      throw err;
+    }
+
     // Verify / execute with provider
     const verification = await this.provider.verifyPayment({
       orderId: payment.gatewayOrderId,
-      simulateOutcome
+      simulateOutcome,
+      reason: failureReason
     });
 
     if (verification.status === PAYMENT_STATUS.SUCCESS) {
@@ -208,59 +284,79 @@ class PaymentService {
       await payment.save();
 
       // Update associated invoice to PAID
+      let invoice = null;
       if (payment.invoiceId) {
-        const invoice = await Invoice.findById(payment.invoiceId);
-        if (invoice) {
-          invoice.status = INVOICE_STATUS.PAID;
-          invoice.paidAmount = payment.amount;
-          invoice.amountPaid = payment.amount;
-          invoice.remainingAmount = 0;
-          invoice.paidAt = payment.paidAt;
-          await invoice.save();
+        invoice = await Invoice.findById(payment.invoiceId);
+      } else {
+        invoice = await Invoice.findOne({
+          bookingId: booking._id,
+          status: { $ne: INVOICE_STATUS.CANCELLED }
+        });
+      }
+
+      if (invoice) {
+        invoice.status = INVOICE_STATUS.PAID;
+        invoice.paidAmount = payment.amount;
+        invoice.amountPaid = payment.amount;
+        invoice.remainingAmount = 0;
+        invoice.paidAt = payment.paidAt;
+        await invoice.save();
+        if (!payment.invoiceId) {
+          payment.invoiceId = invoice._id;
+          await payment.save();
         }
       }
 
       // Update booking pricing & state
-      const booking = await Booking.findById(payment.bookingId);
-      if (booking) {
-        booking.pricing = booking.pricing || {};
-        booking.pricing.paidAmount = payment.amount;
-        booking.pricing.finalTotal = payment.amount;
-        booking.pricing.isPaid = true;
-        booking.pricing.paidAt = payment.paidAt;
+      booking.pricing = booking.pricing || {};
+      booking.pricing.paidAmount = payment.amount;
+      booking.pricing.finalTotal = payment.amount;
+      booking.pricing.isPaid = true;
+      booking.pricing.paidAt = payment.paidAt;
+      booking.paymentStatus = 'PAID';
 
-        // Advance booking status to COMPLETED if not already terminal
-        const terminalStatuses = [
-          BOOKING_STATUS.COMPLETED,
-          BOOKING_STATUS.CANCELLED_BY_CUSTOMER,
-          BOOKING_STATUS.CANCELLED_BY_PROVIDER,
-          BOOKING_STATUS.DISPUTED
-        ];
+      // State progression:
+      // If booking was awaiting payment: next state is PAYMENT_SUCCESS
+      // If booking was in post-work confirmation: next state is INVOICED
+      const terminalStatuses = [
+        BOOKING_STATUS.COMPLETED,
+        BOOKING_STATUS.INVOICED,
+        BOOKING_STATUS.CANCELLED,
+        BOOKING_STATUS.CANCELLED_BY_CUSTOMER,
+        BOOKING_STATUS.CANCELLED_BY_PROVIDER,
+        BOOKING_STATUS.REJECTED,
+        BOOKING_STATUS.DISPUTED
+      ];
 
-        if (!terminalStatuses.includes(booking.status)) {
-          const previousStatus = booking.status;
-          booking.status = BOOKING_STATUS.COMPLETED;
-          booking.statusHistory = booking.statusHistory || [];
-          booking.statusHistory.push({
-            previousStatus,
-            newStatus: BOOKING_STATUS.COMPLETED,
-            actor: {
-              userId: customerId,
-              role: USER_ROLES.CUSTOMER
-            },
-            reason: 'Payment completed successfully. Booking marked as COMPLETED.',
-            timestamp: new Date()
-          });
+      if (!terminalStatuses.includes(booking.status)) {
+        let nextStatus = BOOKING_STATUS.PAYMENT_SUCCESS;
+        if ([BOOKING_STATUS.WORK_COMPLETED, BOOKING_STATUS.CUSTOMER_CONFIRMED].includes(booking.status)) {
+          nextStatus = BOOKING_STATUS.INVOICED;
         }
 
-        await booking.save();
+        const previousStatus = booking.status;
+        booking.status = nextStatus;
+        booking.statusHistory = booking.statusHistory || [];
+        booking.statusHistory.push({
+          previousStatus,
+          newStatus: nextStatus,
+          actor: {
+            userId: customerId,
+            role: userRole || USER_ROLES.CUSTOMER
+          },
+          reason: 'Payment completed successfully. Booking marked as ' + nextStatus + '.',
+          timestamp: new Date()
+        });
       }
+
+      await booking.save();
 
       // Notify customer & provider
       await Promise.all([
         notificationService.notify({
           recipientId: payment.customerId,
           senderId: payment.providerId,
+          bookingId: payment.bookingId,
           type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
           title: 'Payment Successful',
           message: `Your payment of ₹${payment.amount} was completed successfully (Txn: ${payment.transactionId}).`,
@@ -269,8 +365,9 @@ class PaymentService {
         notificationService.notify({
           recipientId: payment.providerId,
           senderId: payment.customerId,
+          bookingId: payment.bookingId,
           type: NOTIFICATION_TYPE.PAYMENT_SUCCESS,
-          title: 'Payment Received',
+          title: 'Payment Successful',
           message: `Customer payment of ₹${payment.amount} received for booking ${booking?.bookingNumber || payment.bookingId}.`,
           data: { paymentId: payment._id, bookingId: payment.bookingId }
         })
@@ -284,13 +381,16 @@ class PaymentService {
       };
     } else if (verification.status === PAYMENT_STATUS.FAILED) {
       payment.status = PAYMENT_STATUS.FAILED;
-      payment.failureReason = failureReason || verification.reason || 'Payment processing failed';
+      payment.failureReason = failureReason || verification.reason || 'Demo payment declined';
       await payment.save();
+
+      // Booking remains payable! Booking status is not modified to terminal.
 
       // Notify customer of failed payment
       await notificationService.notify({
         recipientId: payment.customerId,
         senderId: payment.providerId,
+        bookingId: payment.bookingId,
         type: NOTIFICATION_TYPE.PAYMENT_FAILED,
         title: 'Payment Failed',
         message: `Payment attempt of ₹${payment.amount} failed: ${payment.failureReason}.`,
@@ -305,8 +405,10 @@ class PaymentService {
       };
     } else if (verification.status === PAYMENT_STATUS.CANCELLED) {
       payment.status = PAYMENT_STATUS.CANCELLED;
-      payment.failureReason = verification.reason || 'Payment cancelled by user';
+      payment.failureReason = verification.reason || 'Demo payment cancelled';
       await payment.save();
+
+      // Booking remains valid for later payment.
 
       return {
         success: false,
@@ -340,7 +442,7 @@ class PaymentService {
     } else if (user) {
       if (user.role === USER_ROLES.CUSTOMER) {
         filter.customerId = user._id;
-      } else if (user.role === USER_ROLES.PROVIDER) {
+      } else if (user.role === USER_ROLES.TECHNICIAN || user.role === USER_ROLES.PROVIDER || user.role === 'PROVIDER') {
         filter.providerId = user._id;
       }
     }

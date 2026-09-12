@@ -15,7 +15,14 @@ import ProviderProfilePage from './pages/ProviderProfilePage';
 import ProviderServicesPage from './pages/ProviderServicesPage';
 import BookingDetailPage from './pages/BookingDetailPage';
 import DemoCheckoutPage from './pages/DemoCheckoutPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import HelpPage from './pages/HelpPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import NotificationsPage from './pages/NotificationsPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 function App() {
@@ -27,15 +34,34 @@ function App() {
             <Route index element={<LandingPage />} />
             <Route path="services" element={<ServicesPage />} />
             <Route path="services/:id" element={<ServiceDetailPage />} />
+            <Route path="technicians" element={<ProvidersPage />} />
+            <Route path="technicians/:id" element={<ProviderDetailPage />} />
             <Route path="providers" element={<ProvidersPage />} />
             <Route path="providers/:id" element={<ProviderDetailPage />} />
             <Route path="login" element={<LoginPage />} />
             <Route path="register" element={<RegisterPage />} />
+            
+            {/* Informational Pages */}
+            <Route path="about" element={<AboutPage />} />
+            <Route path="contact" element={<ContactPage />} />
+            <Route path="help" element={<HelpPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
+            <Route path="terms" element={<TermsPage />} />
+
+            {/* Customer Protected Routes */}
             <Route
               path="dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['CUSTOMER']}>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="profile"
+              element={
+                <ProtectedRoute allowedRoles={['CUSTOMER']}>
+                  <DashboardPage initialTab="overview" />
                 </ProtectedRoute>
               }
             />
@@ -50,16 +76,66 @@ function App() {
             <Route
               path="checkout/:bookingId"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedRoles={['CUSTOMER']}>
                   <DemoCheckoutPage />
                 </ProtectedRoute>
               }
             />
-            {/* Provider Portal Protected Routes */}
+            <Route
+              path="notifications"
+              element={
+                <ProtectedRoute>
+                  <NotificationsPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Admin Protected Dashboard */}
+            <Route
+              path="admin/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <AdminDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="admin"
+              element={
+                <ProtectedRoute allowedRoles={['ADMIN']}>
+                  <AdminDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Technician Portal Protected Routes */}
+            <Route
+              path="technician/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
+                  <ProviderDashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="technician/profile"
+              element={
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
+                  <ProviderProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="technician/services"
+              element={
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
+                  <ProviderServicesPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Backward-compatible legacy provider aliases */}
             <Route
               path="provider/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['PROVIDER', 'ADMIN']}>
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
                   <ProviderDashboardPage />
                 </ProtectedRoute>
               }
@@ -67,7 +143,7 @@ function App() {
             <Route
               path="provider/profile"
               element={
-                <ProtectedRoute allowedRoles={['PROVIDER', 'ADMIN']}>
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
                   <ProviderProfilePage />
                 </ProtectedRoute>
               }
@@ -75,7 +151,7 @@ function App() {
             <Route
               path="provider/services"
               element={
-                <ProtectedRoute allowedRoles={['PROVIDER', 'ADMIN']}>
+                <ProtectedRoute allowedRoles={['TECHNICIAN', 'PROVIDER']}>
                   <ProviderServicesPage />
                 </ProtectedRoute>
               }

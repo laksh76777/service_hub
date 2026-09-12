@@ -63,10 +63,19 @@ const invoiceSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      index: true
+    },
+    serviceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Service',
       index: true
     },
     items: [invoiceItemSchema],
@@ -91,6 +100,24 @@ const invoiceSchema = new mongoose.Schema(
       type: Number,
       required: true,
       default: 0
+    },
+    amount: {
+      type: Number,
+      default: 0
+    },
+    currency: {
+      type: String,
+      default: 'INR',
+      trim: true
+    },
+    paymentStatus: {
+      type: String,
+      default: 'PAID',
+      trim: true
+    },
+    date: {
+      type: Date,
+      default: Date.now
     },
     paidAmount: {
       type: Number,
@@ -129,6 +156,30 @@ const invoiceSchema = new mongoose.Schema(
 );
 
 invoiceSchema.pre('validate', function () {
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
+
+  if (this.amount === undefined || this.amount === 0) {
+    this.amount = this.total || 0;
+  } else if ((this.total === undefined || this.total === 0) && this.amount !== undefined) {
+    this.total = this.amount;
+  }
+
+  if (!this.currency) {
+    this.currency = 'INR';
+  }
+
+  if (!this.date) {
+    this.date = this.issuedAt || new Date();
+  }
+
+  if (!this.paymentStatus) {
+    this.paymentStatus = (this.status === INVOICE_STATUS.PAID || this.paidAmount >= this.total) ? 'PAID' : 'PENDING';
+  }
+
   if (this.paidAmount === undefined && this.amountPaid !== undefined) {
     this.paidAmount = this.amountPaid;
   } else if (this.amountPaid === undefined && this.paidAmount !== undefined) {
@@ -147,7 +198,9 @@ invoiceSchema.pre('validate', function () {
 });
 
 invoiceSchema.index({ bookingId: 1, status: 1 });
+invoiceSchema.index({ serviceId: 1 });
 invoiceSchema.index({ customerId: 1, status: 1 });
 invoiceSchema.index({ providerId: 1, status: 1 });
+invoiceSchema.index({ technicianId: 1, status: 1 });
 
 module.exports = mongoose.model('Invoice', invoiceSchema);

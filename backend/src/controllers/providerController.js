@@ -9,7 +9,7 @@ const { PROVIDER_STATUS, SERVICE_PRICING_TYPE } = require('../utils/constants');
  */
 const getPublicProviders = async (req, res) => {
   try {
-    const { search, category, service, pincode, zipCode, city, minRating = 0, limit = 50, page = 1 } = req.query;
+    const { search, category, service, minRating = 0, limit = 50, page = 1 } = req.query;
 
     // Strict security rule: Only VERIFIED providers appear in public marketplace
     const filter = { status: PROVIDER_STATUS.VERIFIED };
@@ -17,6 +17,7 @@ const getPublicProviders = async (req, res) => {
     if (search && search.trim()) {
       filter.$or = [
         { businessName: { $regex: search.trim(), $options: 'i' } },
+        { profession: { $regex: search.trim(), $options: 'i' } },
         { bio: { $regex: search.trim(), $options: 'i' } },
         { 'servicesOffered.customTitle': { $regex: search.trim(), $options: 'i' } }
       ];
@@ -26,21 +27,46 @@ const getPublicProviders = async (req, res) => {
       filter.categories = category;
     }
 
-    if (service && service.match(/^[0-9a-fA-F]{24}$/)) {
-      filter['servicesOffered.serviceId'] = service;
-      filter['servicesOffered.isActive'] = true;
-    }
+    // Dynamic service matching: ID, slug, or name
+    if (service && typeof service === 'string' && service.trim()) {
+      const cleanService = service.trim();
+      let targetService = null;
+      if (cleanService.match(/^[0-9a-fA-F]{24}$/)) {
+        const q = Service.findById(cleanService);
+        targetService = (q && typeof q.lean === 'function') ? await q.lean() : await q;
+      } else {
+        const q = Service.findOne({
+          $or: [
+            { slug: cleanService.toLowerCase() },
+            { name: { $regex: new RegExp(`^${cleanService}$`, 'i') } }
+          ]
+        });
+        targetService = (q && typeof q.lean === 'function') ? await q.lean() : await q;
+      }
 
-    const pin = (pincode || zipCode || '').trim();
-    if (pin) {
-      filter.$or = [
-        { 'serviceArea.pincodes': pin },
-        { 'serviceArea.zipCodes': pin }
-      ];
-    }
-
-    if (city && city.trim()) {
-      filter['serviceArea.cities'] = { $regex: new RegExp(`^${city.trim()}$`, 'i') };
+      if (targetService) {
+        // Must match technicians offering this specific service or category
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            {
+              'servicesOffered.serviceId': targetService._id,
+              'servicesOffered.isActive': true
+            },
+            { categories: targetService.categoryId },
+            { profession: { $regex: targetService.name.split(' ')[0], $options: 'i' } }
+          ]
+        });
+      } else {
+        // If not found in Service model, filter by search keyword in servicesOffered or profession
+        filter.$and = filter.$and || [];
+        filter.$and.push({
+          $or: [
+            { profession: { $regex: cleanService, $options: 'i' } },
+            { 'servicesOffered.customTitle': { $regex: cleanService, $options: 'i' } }
+          ]
+        });
+      }
     }
 
     if (minRating && Number(minRating) > 0) {
@@ -50,7 +76,7 @@ const getPublicProviders = async (req, res) => {
     const skip = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
 
     const providers = await ProviderProfile.find(filter)
-      .populate('userId', 'name email phone avatarUrl')
+      .populate('userId', 'name email phone avatarUrl role status')
       .populate('categories', 'name slug icon')
       .populate('servicesOffered.serviceId', 'name slug categoryId')
       .sort({ 'rating.average': -1, completedJobsCount: -1 })
@@ -58,29 +84,61 @@ const getPublicProviders = async (req, res) => {
       .limit(parseInt(limit, 10))
       .lean();
 
-    const total = await ProviderProfile.countDocuments(filter);
+    // Security & Eligibility Rule:
+    // A technician can appear to customers only when:
+    // * active
+    // * verified
+    // * supports the selected service
+    // Strictly exclude ADMIN and CUSTOMER
+    const validProviders = providers.filter((p) => {
+      const user = p.userId;
+      if (!user) return false;
+      if (user.role === 'ADMIN' || user.role === 'CUSTOMER') return false;
+      if (user.role !== 'TECHNICIAN' && user.role !== 'PROVIDER') return false;
+      if (user.status && user.status !== 'ACTIVE') return false;
+      return true;
+    });
 
-    // Format safe response for customers
-    const formatted = providers.map((p) => ({
-      id: p._id,
-      businessName: p.businessName,
-      bio: p.bio,
-      rating: p.rating,
-      completedJobsCount: p.completedJobsCount,
-      categories: p.categories,
-      serviceArea: p.serviceArea,
-      availabilitySummary: {
-        days: p.availability?.days || [],
-        workingHours: p.availability?.workingHours || { start: '09:00', end: '18:00' },
-        emergencyServices: !!p.availability?.emergencyServices
-      },
-      servicesCount: (p.servicesOffered || []).filter((s) => s.isActive).length,
-      user: p.userId
-    }));
+    const total = validProviders.length;
+
+    // Format technician cards with all required display fields
+    const formatted = validProviders.map((p) => {
+      const servicesList = (p.servicesOffered || [])
+        .filter((s) => s.isActive)
+        .map((s) => s.customTitle || s.serviceId?.name || 'Trade Service');
+
+      return {
+        id: p._id,
+        name: p.userId?.name || p.businessName,
+        businessName: p.businessName,
+        profession: p.profession || 'General Service Technician',
+        experience: p.experience || `${p.experienceYears || 1} years`,
+        experienceYears: p.experienceYears || 1,
+        bio: p.bio,
+        rating: p.rating || { average: 5.0, count: 0 },
+        completedJobsCount: p.completedJobsCount || 0,
+        services: servicesList.length > 0 ? servicesList : [p.profession || 'Trade Service'],
+        servicesOffered: p.servicesOffered || [],
+        categories: p.categories,
+        availability: {
+          days: p.availability?.days || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+          workingHours: p.availability?.workingHours || { start: '08:00', end: '20:00' },
+          emergencyServices: !!p.availability?.emergencyServices
+        },
+        availabilitySummary: {
+          days: p.availability?.days || ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+          workingHours: p.availability?.workingHours || { start: '08:00', end: '20:00' },
+          emergencyServices: !!p.availability?.emergencyServices
+        },
+        verificationStatus: p.status || 'VERIFIED',
+        user: p.userId
+      };
+    });
 
     return res.status(200).json({
       success: true,
       data: {
+        technicians: formatted,
         providers: formatted,
         total,
         page: parseInt(page, 10),
@@ -91,25 +149,25 @@ const getPublicProviders = async (req, res) => {
     console.error('[ProviderController] getPublicProviders error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to retrieve providers: ' + error.message
+      message: 'Failed to retrieve technicians: ' + error.message
     });
   }
 };
 
 /**
  * GET /api/providers/:id
- * Public Customer Endpoint: View detailed public profile of a provider.
+ * Public Customer Endpoint: View detailed public profile of a technician.
  */
 const getPublicProviderById = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ success: false, message: 'Invalid provider ID format' });
+      return res.status(400).json({ success: false, message: 'Invalid technician ID format' });
     }
 
     const provider = await ProviderProfile.findById(id)
-      .populate('userId', 'name email avatarUrl')
+      .populate('userId', 'name email phone avatarUrl role status')
       .populate('categories', 'name slug icon description')
       .populate({
         path: 'servicesOffered.serviceId',
@@ -119,19 +177,24 @@ const getPublicProviderById = async (req, res) => {
       .lean();
 
     if (!provider) {
-      return res.status(404).json({ success: false, message: 'Provider profile not found' });
+      return res.status(404).json({ success: false, message: 'Technician profile not found' });
+    }
+
+    // Security: Admin or Customer can never be viewed as a technician
+    if (provider.userId?.role === 'ADMIN' || provider.userId?.role === 'CUSTOMER') {
+      return res.status(404).json({ success: false, message: 'Technician profile not found' });
     }
 
     // Security: Only VERIFIED providers can be viewed publicly (unless the owner or admin is viewing)
     const isOwnerOrAdmin =
       req.user &&
       (req.user.role === 'ADMIN' ||
-        provider.userId._id?.toString() === req.user._id.toString());
+        provider.userId?._id?.toString() === req.user._id?.toString());
 
     if (provider.status !== PROVIDER_STATUS.VERIFIED && !isOwnerOrAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'This provider profile is pending verification and is not publicly visible yet.'
+        message: 'This technician profile is pending verification and is not publicly visible yet.'
       });
     }
 
@@ -140,30 +203,42 @@ const getPublicProviderById = async (req, res) => {
       (s) => s.isActive && s.serviceId
     );
 
+    const servicesList = activeOfferings.map(
+      (s) => s.customTitle || s.serviceId?.name || 'Trade Service'
+    );
+
+    const technicianData = {
+      id: provider._id,
+      name: provider.userId?.name || provider.businessName,
+      businessName: provider.businessName,
+      profession: provider.profession || 'General Service Technician',
+      experience: provider.experience || `${provider.experienceYears || 1} years`,
+      experienceYears: provider.experienceYears || 1,
+      bio: provider.bio,
+      licenseNumber: provider.licenseNumber ? `License Verified (${provider.licenseNumber})` : null,
+      rating: provider.rating || { average: 5.0, count: 0 },
+      completedJobsCount: provider.completedJobsCount || 0,
+      categories: provider.categories,
+      availability: provider.availability,
+      services: activeOfferings,
+      servicesList: servicesList.length > 0 ? servicesList : [provider.profession || 'Trade Service'],
+      verificationStatus: provider.status,
+      status: provider.status,
+      user: provider.userId
+    };
+
     return res.status(200).json({
       success: true,
       data: {
-        provider: {
-          id: provider._id,
-          businessName: provider.businessName,
-          bio: provider.bio,
-          licenseNumber: provider.licenseNumber ? `License Verified (${provider.licenseNumber})` : null,
-          rating: provider.rating,
-          completedJobsCount: provider.completedJobsCount,
-          categories: provider.categories,
-          serviceArea: provider.serviceArea,
-          availability: provider.availability,
-          services: activeOfferings,
-          status: provider.status,
-          user: provider.userId
-        }
+        technician: technicianData,
+        provider: technicianData
       }
     });
   } catch (error) {
     console.error('[ProviderController] getPublicProviderById error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to retrieve provider profile: ' + error.message
+      message: 'Failed to retrieve technician profile: ' + error.message
     });
   }
 };
@@ -215,6 +290,13 @@ const getMyProviderProfile = async (req, res) => {
  */
 const updateMyProviderProfile = async (req, res) => {
   try {
+    if (req.user.role === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Admin accounts do not have a technician profile. Use admin endpoints for platform management.'
+      });
+    }
+
     let profile = await ProviderProfile.findOne({ userId: req.user._id });
 
     if (!profile) {
@@ -223,6 +305,9 @@ const updateMyProviderProfile = async (req, res) => {
 
     const {
       businessName,
+      profession,
+      experience,
+      experienceYears,
       bio,
       licenseNumber,
       insuranceDetails,
@@ -233,6 +318,18 @@ const updateMyProviderProfile = async (req, res) => {
 
     if (businessName && typeof businessName === 'string') {
       profile.businessName = businessName.trim();
+    }
+
+    if (profession && typeof profession === 'string') {
+      profile.profession = profession.trim();
+    }
+
+    if (experience && typeof experience === 'string') {
+      profile.experience = experience.trim();
+    }
+
+    if (experienceYears !== undefined) {
+      profile.experienceYears = Number(experienceYears) || profile.experienceYears;
     }
 
     if (bio !== undefined) profile.bio = String(bio).trim();

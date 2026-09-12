@@ -63,10 +63,14 @@ const estimateSchema = new mongoose.Schema(
       required: true,
       index: true
     },
+    technicianId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      index: true
+    },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
       index: true
     },
     customerId: {
@@ -107,6 +111,12 @@ const estimateSchema = new mongoose.Schema(
       required: true,
       default: 0
     },
+    currency: {
+      type: String,
+      default: 'INR',
+      uppercase: true,
+      trim: true
+    },
     status: {
       type: String,
       enum: Object.values(ESTIMATE_STATUS),
@@ -138,6 +148,12 @@ const estimateSchema = new mongoose.Schema(
 );
 
 estimateSchema.pre('validate', function () {
+  if (this.technicianId && !this.providerId) {
+    this.providerId = this.technicianId;
+  } else if (this.providerId && !this.technicianId) {
+    this.technicianId = this.providerId;
+  }
+
   if (this.taxes === undefined && this.tax !== undefined) {
     this.taxes = this.tax;
   } else if (this.tax === undefined && this.taxes !== undefined) {
@@ -148,5 +164,6 @@ estimateSchema.pre('validate', function () {
 estimateSchema.index({ bookingId: 1, status: 1 });
 estimateSchema.index({ customerId: 1, status: 1 });
 estimateSchema.index({ providerId: 1, status: 1 });
+estimateSchema.index({ technicianId: 1, status: 1 });
 
 module.exports = mongoose.model('Estimate', estimateSchema);

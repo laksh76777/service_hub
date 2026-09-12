@@ -5,14 +5,7 @@ import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
-
-const DEMO_ACCOUNTS = [
-  { role: 'Admin', email: 'abc@gmail.com', label: '👑 Demo Admin', desc: 'Full dispute arbitration & ledger oversight' },
-  { role: 'Customer', email: 'laksh@gmail.com', label: '👤 Demo Customer', desc: 'Laksh Suthar (Indiranagar, Bengaluru)' },
-  { role: 'AC Technician', email: 'ac.tech@servicehub.demo', label: '❄️ AC Tech Pro', desc: 'Rahul Sharma (CoolCare Services)' },
-  { role: 'Plumber', email: 'plumber@servicehub.demo', label: '🚰 Plumber Pro', desc: 'Imran Khan (QuickFix Plumbing)' },
-  { role: 'Electrician', email: 'electrician@servicehub.demo', label: '⚡ Electrician Pro', desc: 'Arjun Patel (PowerFix Electricals)' }
-];
+import { getDemoAccounts } from '../services/api';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -20,6 +13,15 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [demoAccounts, setDemoAccounts] = useState([
+    { role: 'Admin', email: 'abc@gmail.com', label: '👑 Demo Admin', desc: 'Platform oversight & moderation' },
+    { role: 'Customer', email: 'laksh@gmail.com', label: '👤 Demo Customer', desc: 'Laksh Suthar (Indiranagar, Bengaluru)' },
+    { role: 'Technician', email: 'ac@gmail.com', label: '❄️ AC Technician', desc: 'Rahul Sharma (CoolCare AC Solutions)' },
+    { role: 'Technician', email: 'plumber@gmail.com', label: '🚰 Plumber', desc: 'Imran Khan (QuickFix Plumbing)' },
+    { role: 'Technician', email: 'electrician@gmail.com', label: '⚡ Electrician', desc: 'Arjun Patel (PowerFix Electricals)' },
+    { role: 'Technician', email: 'ro@gmail.com', label: '💧 RO Technician', desc: 'Suresh Verma (PureFlow RO Systems)' },
+    { role: 'Technician', email: 'appliance@gmail.com', label: '🧺 Appliance Specialist', desc: 'Vikram Singh (SmartCare Appliances)' }
+  ]);
 
   // Password reset modal state
   const [showResetModal, setShowResetModal] = useState(false);
@@ -34,14 +36,28 @@ const LoginPage = () => {
 
   const from = location.state?.from?.pathname || null;
 
+  // Exact post-login role redirection
   const getRoleDashboard = (role) => {
-    if (role === 'PROVIDER' || role === 'ADMIN') return '/provider/dashboard';
+    const r = (role || '').toUpperCase();
+    if (r === 'ADMIN') return '/admin/dashboard';
+    if (r === 'TECHNICIAN' || r === 'PROVIDER') return '/technician/dashboard';
     return '/dashboard';
   };
 
   useEffect(() => {
+    getDemoAccounts()
+      .then((res) => {
+        if (res?.data?.data?.accounts && res.data.data.accounts.length > 0) {
+          setDemoAccounts(res.data.data.accounts);
+        }
+      })
+      .catch(() => {
+        // Retain fallback demo accounts
+      });
+  }, []);
+
+  useEffect(() => {
     if (isAuthenticated && mongoUser) {
-      // If user was trying to access a specific page, honor it; otherwise role-based redirect
       navigate(from || getRoleDashboard(mongoUser.role), { replace: true });
     }
   }, [isAuthenticated, mongoUser, navigate, from]);
@@ -110,11 +126,12 @@ const LoginPage = () => {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-        {/* Left: Sign In Form */}
+        
+        {/* Left: Login Form */}
         <div className="md:col-span-7">
           <Card
-            title="Welcome Back to ServiceHub"
-            subtitle="Sign in with your verified credentials"
+            title="ServiceHub Login"
+            subtitle="Sign in to manage your bookings, estimates, or service requests"
           >
             {errorMessage && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
@@ -130,7 +147,7 @@ const LoginPage = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Email Address"
+                label="Email"
                 type="email"
                 placeholder="name@example.com"
                 value={email}
@@ -162,16 +179,33 @@ const LoginPage = () => {
               </div>
 
               <div className="pt-2">
-                <Button type="submit" variant="primary" className="w-full shadow-md shadow-blue-500/20" disabled={loading}>
-                  {loading ? 'Signing In...' : 'Sign In to Account →'}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  className="w-full shadow-md shadow-blue-500/20 text-sm font-bold py-2.5"
+                  disabled={loading}
+                >
+                  {loading ? 'Logging In...' : 'Login'}
                 </Button>
               </div>
             </form>
 
-            <div className="mt-6 text-center text-xs text-slate-500">
-              Don't have an account?{' '}
-              <Link to="/register" className="text-blue-600 font-semibold hover:underline">
-                Create new customer account
+            {/* User-specified Links: Register as Customer & Register as Technician */}
+            <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <Link
+                to="/register?role=CUSTOMER"
+                className="text-blue-600 font-semibold hover:underline flex items-center gap-1"
+              >
+                <span>👤</span>
+                <span>Register as Customer</span>
+              </Link>
+              <span className="text-slate-300 hidden sm:inline">|</span>
+              <Link
+                to="/register?role=TECHNICIAN"
+                className="text-slate-800 font-semibold hover:text-blue-600 hover:underline flex items-center gap-1"
+              >
+                <span>🔧</span>
+                <span>Register as Technician</span>
               </Link>
             </div>
           </Card>
@@ -183,12 +217,12 @@ const LoginPage = () => {
             <span className="text-lg">⚡</span>
             <div>
               <h3 className="text-sm font-bold text-white">1-Click Demo Accounts</h3>
-              <p className="text-[11px] text-slate-400">Click any role to autofill credentials</p>
+              <p className="text-[11px] text-slate-400">Click any role to autofill and sign in</p>
             </div>
           </div>
 
           <div className="space-y-2 pt-2">
-            {DEMO_ACCOUNTS.map((acc) => (
+            {demoAccounts.map((acc) => (
               <button
                 key={acc.email}
                 type="button"
@@ -209,7 +243,7 @@ const LoginPage = () => {
 
           <div className="pt-3 border-t border-white/10 text-[10px] text-slate-400 flex items-center gap-1.5">
             <span>🔒</span>
-            <span>Demo accounts authenticate safely via Firebase Auth.</span>
+            <span>Customer, Technician, and Admin roles securely tested.</span>
           </div>
         </div>
       </div>

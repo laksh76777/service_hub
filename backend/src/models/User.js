@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: Object.values(USER_ROLES),
+      enum: ['CUSTOMER', 'TECHNICIAN', 'ADMIN', 'PROVIDER'],
       default: USER_ROLES.CUSTOMER,
       index: true
     },

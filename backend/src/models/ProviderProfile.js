@@ -16,6 +16,22 @@ const providerProfileSchema = new mongoose.Schema(
       trim: true,
       index: true
     },
+    profession: {
+      type: String,
+      trim: true,
+      default: 'General Service Technician',
+      index: true
+    },
+    experience: {
+      type: String,
+      trim: true,
+      default: '1 year'
+    },
+    experienceYears: {
+      type: Number,
+      default: 1,
+      min: 0
+    },
     bio: {
       type: String,
       trim: true,

@@ -444,11 +444,338 @@ Do NOT output markdown code blocks. Do not add conversational text.`;
   return JSON.parse(cleanedText);
 };
 
+// module.exports is at the bottom of this file — see end of aiService.js
+
+// =========================================================
+// FEATURE 2 — TECHNICIAN ESTIMATE ASSISTANCE
+// AI can summarize inspection notes and suggest item
+// descriptions. The technician remains fully responsible.
+// =========================================================
+
+/**
+ * Pattern-based technician estimate assistant
+ * @param {string} inspectionNotes
+ * @param {string} [serviceName]
+ * @returns {Object}
+ */
+function assistEstimateWithPatternEngine(inspectionNotes, serviceName = '') {
+  const lower = (inspectionNotes || '').toLowerCase();
+  const suggestions = [];
+
+  // Labour
+  suggestions.push({ type: 'LABOUR', description: 'Technician labour charges for on-site diagnosis and repair work' });
+
+  // AC related
+  if (lower.includes('capacitor')) suggestions.push({ type: 'PART', description: 'Capacitor replacement (motor/compressor start/run)' });
+  if (lower.includes('gas') || lower.includes('refrigerant')) suggestions.push({ type: 'SERVICE', description: 'Refrigerant gas charging (R-22 / R-32) and leak test' });
+  if (lower.includes('filter') || lower.includes('clean')) suggestions.push({ type: 'SERVICE', description: 'Air filter cleaning and coil wash' });
+  if (lower.includes('compressor')) suggestions.push({ type: 'PART', description: 'Compressor replacement or overhaul' });
+  if (lower.includes('pcb') || lower.includes('board')) suggestions.push({ type: 'PART', description: 'PCB control board replacement' });
+
+  // Plumbing related
+  if (lower.includes('washer') || lower.includes('tap') || lower.includes('faucet')) suggestions.push({ type: 'PART', description: 'Rubber washer and spindle replacement' });
+  if (lower.includes('pipe') || lower.includes('joint')) suggestions.push({ type: 'PART', description: 'Pipe fitting and joint sealing' });
+  if (lower.includes('drain') || lower.includes('clog')) suggestions.push({ type: 'SERVICE', description: 'Drain cleaning and blockage removal' });
+
+  // Electrical related
+  if (lower.includes('switch') || lower.includes('socket')) suggestions.push({ type: 'PART', description: 'Switch / socket module replacement' });
+  if (lower.includes('mcb') || lower.includes('breaker')) suggestions.push({ type: 'PART', description: 'MCB breaker unit replacement' });
+  if (lower.includes('wire') || lower.includes('wiring')) suggestions.push({ type: 'SERVICE', description: 'Electrical wiring inspection and re-routing' });
+
+  // Geyser / water heater
+  if (lower.includes('element') || lower.includes('geyser')) suggestions.push({ type: 'PART', description: 'Heating element replacement' });
+  if (lower.includes('thermostat')) suggestions.push({ type: 'PART', description: 'Thermostat replacement' });
+
+  // RO purifier
+  if (lower.includes('membrane') || lower.includes('ro')) suggestions.push({ type: 'PART', description: 'RO membrane replacement' });
+  if (lower.includes('pre-carbon') || lower.includes('carbon')) suggestions.push({ type: 'PART', description: 'Pre-carbon / post-carbon filter cartridge' });
+  if (lower.includes('pump') || lower.includes('booster')) suggestions.push({ type: 'PART', description: 'Booster pump replacement' });
+
+  // Generic parts
+  if (lower.includes('motor')) suggestions.push({ type: 'PART', description: 'Motor unit replacement' });
+  if (lower.includes('seal') || lower.includes('gasket')) suggestions.push({ type: 'PART', description: 'Rubber seal / gasket set' });
+
+  // Consumables / visit charge
+  suggestions.push({ type: 'OTHER', description: 'Consumables and sundry materials' });
+
+  // Summarize inspection notes
+  const words = (inspectionNotes || '').trim().split(/\s+/).filter(Boolean);
+  const summary = words.length > 15
+    ? words.slice(0, 15).join(' ') + '...'
+    : inspectionNotes.trim();
+
+  return {
+    inspectionSummary: summary || 'On-site inspection and fault identification completed.',
+    suggestedItems: suggestions,
+    disclaimer: 'AI suggestions are advisory only. Technician must review and confirm all items, quantities, and prices.',
+    isRecommendationOnly: true
+  };
+}
+
+/**
+ * AI Estimate Assistance — Feature 2
+ * @param {string} inspectionNotes
+ * @param {string} [serviceName]
+ * @param {Object} [options]
+ * @returns {Promise<Object>}
+ */
+const assistEstimate = async (inspectionNotes, serviceName = '', options = {}) => {
+  if (!inspectionNotes || typeof inspectionNotes !== 'string' || !inspectionNotes.trim()) {
+    const err = new Error('Inspection notes are required for estimate assistance.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  try {
+    if (process.env.GEMINI_API_KEY && !options.forcePatternEngine) {
+      const result = await callGeminiEstimateAssist(inspectionNotes.trim(), serviceName);
+      return result;
+    }
+    return assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+  } catch (err) {
+    console.warn('[AIService] Estimate assist failed, falling back to pattern engine:', err.message);
+    try {
+      return assistEstimateWithPatternEngine(inspectionNotes.trim(), serviceName);
+    } catch (fallbackErr) {
+      return {
+        inspectionSummary: inspectionNotes.trim().slice(0, 100),
+        suggestedItems: [
+          { type: 'LABOUR', description: 'Technician labour and service charges' },
+          { type: 'PART', description: 'Parts and materials as required' }
+        ],
+        disclaimer: 'AI unavailable. Suggestions are basic defaults only.',
+        isRecommendationOnly: true,
+        fallbackUsed: true
+      };
+    }
+  }
+};
+
+/**
+ * Gemini-powered estimate assist (optional)
+ */
+const callGeminiEstimateAssist = async (inspectionNotes, serviceName) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const prompt = `You are an assistant for a home services platform in India called ServiceHub.
+A technician completed on-site inspection and wrote these notes: "${inspectionNotes}"
+Service type: ${serviceName || 'General home service'}
+
+Generate a structured advisory to help the technician prepare an accurate estimate.
+Respond ONLY with a single valid JSON object matching this schema:
+{
+  "inspectionSummary": "1-2 sentence summary of the problem identified",
+  "suggestedItems": [
+    { "type": "LABOUR" | "PART" | "SERVICE" | "OTHER", "description": "concise item description" }
+  ],
+  "disclaimer": "AI suggestions are advisory only. Technician must confirm all details.",
+  "isRecommendationOnly": true
+}
+Maximum 5 suggested items. Do NOT include prices. Do NOT output markdown.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.2, responseMimeType: 'application/json' }
+    }),
+    signal: AbortSignal.timeout(6000)
+  });
+  if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
+  const json = await response.json();
+  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Empty Gemini response');
+  const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const parsed = JSON.parse(clean);
+  parsed.isRecommendationOnly = true;
+  return parsed;
+};
+
+// =========================================================
+// FEATURE 3 — ADMIN PLATFORM SUMMARY
+// AI generates informational summaries for admin.
+// Never makes decisions, never approves/rejects anything.
+// =========================================================
+
+/**
+ * Pattern-based admin summary generator
+ */
+function generateAdminSummaryWithPatternEngine(data, summaryType) {
+  const { overview = {}, bookings = [], disputes = [], services = [] } = data;
+
+  if (summaryType === 'bookings') {
+    const total = overview.totalBookings || bookings.length || 0;
+    const active = overview.activeBookings || 0;
+    const completed = overview.completedBookings || 0;
+    const pending = overview.pendingVerification || 0;
+    return {
+      summaryType: 'bookings',
+      headline: `Platform has ${total} total bookings with ${active} currently active.`,
+      insights: [
+        `${completed} bookings have been successfully completed to date.`,
+        active > 0 ? `${active} bookings are currently in progress across various service stages.` : 'No bookings are currently in progress.',
+        pending > 0 ? `${pending} technician verification requests are pending admin review.` : 'No pending verification requests.',
+        `Payment volume stands at ₹${overview.totalPaymentVolume?.toLocaleString('en-IN') || '0'} with ${overview.successfulPayments || 0} successful transactions.`
+      ],
+      disclaimer: 'AI summary is informational only. All decisions must be made by authorized personnel.',
+      isInformationalOnly: true,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  if (summaryType === 'disputes') {
+    const openDisputes = overview.openDisputes || disputes.filter((d) => d.status === 'OPEN').length || 0;
+    const totalDisputes = disputes.length || 0;
+    return {
+      summaryType: 'disputes',
+      headline: `${openDisputes} open dispute(s) currently require admin attention.`,
+      insights: [
+        totalDisputes > 0 ? `${totalDisputes} disputes recorded on the platform.` : 'No disputes have been recorded.',
+        openDisputes > 0
+          ? `${openDisputes} dispute(s) are open and may need manual review and resolution.`
+          : 'All disputes have been resolved or closed.',
+        'Disputes are resolved via admin review only. AI cannot make dispute decisions.'
+      ],
+      disclaimer: 'AI summary is informational only. Dispute resolution must be performed by admin.',
+      isInformationalOnly: true,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  if (summaryType === 'service_trends') {
+    const totalServices = services.length || overview.totalServices || 0;
+    const totalCustomers = overview.totalCustomers || 0;
+    const totalTechnicians = overview.totalTechnicians || 0;
+    return {
+      summaryType: 'service_trends',
+      headline: `ServiceHub currently offers ${totalServices} active services with ${totalTechnicians} verified technicians serving ${totalCustomers} customers.`,
+      insights: [
+        `${totalServices} services are currently available on the platform.`,
+        `${totalTechnicians} technicians are registered; only verified technicians receive customer requests.`,
+        `${totalCustomers} customers are registered on the platform.`,
+        overview.failedPayments > 0
+          ? `${overview.failedPayments} failed payment(s) recorded — may indicate checkout flow issues worth reviewing.`
+          : 'No failed payments reported recently.'
+      ],
+      disclaimer: 'AI summary is informational only and does not imply any automated action.',
+      isInformationalOnly: true,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
+  return {
+    summaryType: summaryType || 'general',
+    headline: 'ServiceHub platform operational summary.',
+    insights: [
+      `Total customers: ${overview.totalCustomers || 0}`,
+      `Total technicians: ${overview.totalTechnicians || 0}`,
+      `Active bookings: ${overview.activeBookings || 0}`,
+      `Open disputes: ${overview.openDisputes || 0}`
+    ],
+    disclaimer: 'AI summary is informational only.',
+    isInformationalOnly: true,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+/**
+ * Admin AI Summary — Feature 3
+ * @param {Object} data - Platform data snapshot (overview, bookings, disputes, services)
+ * @param {string} summaryType - 'bookings' | 'disputes' | 'service_trends' | 'general'
+ * @param {Object} [options]
+ * @returns {Promise<Object>}
+ */
+const generateAdminSummary = async (data, summaryType = 'general', options = {}) => {
+  try {
+    if (process.env.GEMINI_API_KEY && !options.forcePatternEngine) {
+      const result = await callGeminiAdminSummary(data, summaryType);
+      return result;
+    }
+    return generateAdminSummaryWithPatternEngine(data, summaryType);
+  } catch (err) {
+    console.warn('[AIService] Admin summary failed, falling back to pattern engine:', err.message);
+    try {
+      return generateAdminSummaryWithPatternEngine(data, summaryType);
+    } catch (fallbackErr) {
+      return {
+        summaryType,
+        headline: 'Platform summary unavailable.',
+        insights: ['AI summary service temporarily unavailable. Please review the dashboard data directly.'],
+        disclaimer: 'AI summary is informational only.',
+        isInformationalOnly: true,
+        fallbackUsed: true,
+        generatedAt: new Date().toISOString()
+      };
+    }
+  }
+};
+
+/**
+ * Gemini-powered admin summary (optional)
+ */
+const callGeminiAdminSummary = async (data, summaryType) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  const { overview = {} } = data;
+  const contextStr = JSON.stringify({
+    totalCustomers: overview.totalCustomers || 0,
+    totalTechnicians: overview.totalTechnicians || 0,
+    activeBookings: overview.activeBookings || 0,
+    completedBookings: overview.completedBookings || 0,
+    totalPaymentVolume: overview.totalPaymentVolume || 0,
+    openDisputes: overview.openDisputes || 0,
+    pendingVerification: overview.pendingVerification || 0
+  });
+
+  const prompt = `You are an informational assistant for ServiceHub, an Indian home services platform.
+Summarize the following platform statistics for the admin dashboard.
+Summary type requested: ${summaryType}
+Platform data: ${contextStr}
+
+Rules:
+- Be concise and factual. 
+- Do NOT make decisions, recommendations about business actions, or suggest approving/rejecting anything.
+- Provide 3-4 brief insights.
+- Respond ONLY with a valid JSON object:
+{
+  "summaryType": "${summaryType}",
+  "headline": "One sentence summary",
+  "insights": ["insight 1", "insight 2", "insight 3"],
+  "disclaimer": "AI summary is informational only.",
+  "isInformationalOnly": true,
+  "generatedAt": "${new Date().toISOString()}"
+}
+Do NOT output markdown.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.15, responseMimeType: 'application/json' }
+    }),
+    signal: AbortSignal.timeout(6000)
+  });
+  if (!response.ok) throw new Error(`Gemini HTTP ${response.status}`);
+  const json = await response.json();
+  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Empty Gemini response');
+  const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  const parsed = JSON.parse(clean);
+  parsed.isInformationalOnly = true;
+  return parsed;
+};
+
 module.exports = {
   classifyServiceRequest,
   validateAiClassification,
   classifyWithPatternEngine,
+  assistEstimate,
+  generateAdminSummary,
   ALLOWED_CATEGORIES,
   ALLOWED_URGENCIES,
   ADVISORY_DISCLAIMER
 };
+
+

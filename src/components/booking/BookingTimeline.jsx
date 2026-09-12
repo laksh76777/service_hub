@@ -2,22 +2,44 @@ import React, { useState } from 'react';
 
 const LIFECYCLE_STEPS = [
   { key: 'REQUESTED', label: 'Requested', desc: 'Customer submitted request' },
-  { key: 'ACCEPTED', label: 'Accepted', desc: 'Provider confirmed request' },
+  { key: 'ACCEPTED', label: 'Accepted', desc: 'Technician accepted' },
   { key: 'SCHEDULED', label: 'Scheduled', desc: 'Arrival window set' },
-  { key: 'TECHNICIAN_ARRIVED', label: 'Arrived', desc: 'Technician on-site' },
-  { key: 'IN_PROGRESS', label: 'In Progress', desc: 'Work actively underway' },
-  { key: 'COMPLETION_PENDING', label: 'Review Pending', desc: 'Work finished, pending signoff' },
-  { key: 'CUSTOMER_VERIFIED', label: 'Verified', desc: 'Customer approved work' },
-  { key: 'COMPLETED', label: 'Completed', desc: 'Booking finalized' }
+  { key: 'INSPECTION', label: 'Inspection', desc: 'On-site diagnosis' },
+  { key: 'ESTIMATE_APPROVED', label: 'Estimate', desc: 'Scope approved' },
+  { key: 'PAYMENT_SUCCESS', label: 'Payment', desc: 'Payment verified' },
+  { key: 'WORK_IN_PROGRESS', label: 'Work', desc: 'Work underway' },
+  { key: 'WORK_COMPLETED', label: 'Done', desc: 'Technician finished' },
+  { key: 'CUSTOMER_CONFIRMED', label: 'Confirmed', desc: 'Customer confirmed' },
+  { key: 'INVOICED', label: 'Invoiced', desc: 'Warranty & Invoice active' }
 ];
 
 const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
   const [showFullHistory, setShowFullHistory] = useState(false);
 
-  const isCancelled = currentStatus.includes('CANCELLED');
-  const isDisputed = currentStatus === 'DISPUTED';
+  const isCancelled = currentStatus === 'CANCELLED' || currentStatus.includes('CANCELLED');
+  const isRejected = currentStatus === 'REJECTED';
 
-  const currentIndex = LIFECYCLE_STEPS.findIndex((s) => s.key === currentStatus);
+  const getStepIndex = (st) => {
+    switch (st) {
+      case 'REQUESTED': return 0;
+      case 'ACCEPTED': return 1;
+      case 'SCHEDULED': return 2;
+      case 'INSPECTION': return 3;
+      case 'ESTIMATE_PENDING':
+      case 'ESTIMATE_SUBMITTED':
+      case 'ESTIMATE_APPROVED': return 4;
+      case 'PAYMENT_PENDING':
+      case 'PAYMENT_SUCCESS': return 5;
+      case 'WORK_IN_PROGRESS': return 6;
+      case 'WORK_COMPLETED': return 7;
+      case 'CUSTOMER_CONFIRMED': return 8;
+      case 'INVOICED':
+      case 'COMPLETED': return 9;
+      default: return 0;
+    }
+  };
+
+  const currentIndex = getStepIndex(currentStatus);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -28,18 +50,18 @@ const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
         </div>
         {isCancelled && (
           <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">
-            {currentStatus}
+            CANCELLED
           </span>
         )}
-        {isDisputed && (
-          <span className="px-2.5 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full animate-pulse">
-            DISPUTED - UNDER REVIEW
+        {isRejected && (
+          <span className="px-2.5 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full">
+            REJECTED
           </span>
         )}
       </div>
 
       {/* Visual Stepper */}
-      {!isCancelled && (
+      {!isCancelled && !isRejected && (
         <div className="relative my-6">
           <div className="hidden md:flex items-center justify-between relative z-10">
             {LIFECYCLE_STEPS.map((step, idx) => {

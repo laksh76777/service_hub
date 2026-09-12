@@ -116,13 +116,13 @@ const WarrantyCard = ({ booking, isCustomer, isProvider, isAdmin }) => {
         </div>
 
         {/* Action button in header */}
-        {!warranty && (isProvider || isAdmin) && ['CUSTOMER_VERIFIED', 'COMPLETED'].includes(booking?.status) && (
+        {!warranty && (isProvider || isCustomer || isAdmin) && ['CUSTOMER_VERIFIED', 'CUSTOMER_CONFIRMED', 'WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(booking?.status) && (
           <Button
             size="sm"
             variant="primary"
             onClick={() => setAssignModalOpen(true)}
           >
-            + Assign Warranty
+            + Activate Warranty
           </Button>
         )}
 
@@ -147,13 +147,13 @@ const WarrantyCard = ({ booking, isCustomer, isProvider, isAdmin }) => {
             No warranty assigned yet.
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
-            The service contractor can assign warranty coverage upon work sign-off.
+            Workmanship warranty coverage is activated upon verified service completion.
           </p>
         </div>
       ) : (
         <div className="mt-4 space-y-4">
           {/* Warranty Summary Header */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
             <div>
               <span className="text-slate-400 text-[10px] uppercase font-bold block">Warranty Code</span>
               <span className="font-mono font-bold text-slate-900 dark:text-white">
@@ -161,15 +161,27 @@ const WarrantyCard = ({ booking, isCustomer, isProvider, isAdmin }) => {
               </span>
             </div>
             <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Valid Until</span>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Warranty Period</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {warranty.warrantyPeriod || `${warranty.durationDays} Days`}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Start Date</span>
+              <span className="font-medium text-slate-800 dark:text-slate-200">
+                {new Date(warranty.startDate).toLocaleDateString('en-IN')}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">End Date</span>
               <span className="font-medium text-slate-800 dark:text-slate-200">
                 {new Date(warranty.endDate).toLocaleDateString('en-IN')}
               </span>
             </div>
             <div>
-              <span className="text-slate-400 text-[10px] uppercase font-bold block">Duration</span>
+              <span className="text-slate-400 text-[10px] uppercase font-bold block">Service & Booking</span>
               <span className="font-medium text-slate-800 dark:text-slate-200">
-                {warranty.durationDays} Days
+                {warranty.serviceId?.name || booking.serviceId?.name || 'Service'} ({booking.bookingNumber})
               </span>
             </div>
             <div>
@@ -187,7 +199,7 @@ const WarrantyCard = ({ booking, isCustomer, isProvider, isAdmin }) => {
           </div>
 
           <div className="text-xs text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-            <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">Coverage Terms:</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">Warranty Terms:</span>
             {warranty.terms}
           </div>
 

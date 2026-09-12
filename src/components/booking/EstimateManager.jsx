@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Modal from '../common/Modal';
-import { createEstimate, getBookingEstimates, approveEstimate, rejectEstimate } from '../../services/api';
+import { createEstimate, getBookingEstimates, approveEstimate, rejectEstimate, aiAssistEstimate } from '../../services/api';
 
 const ITEM_TYPES = [
   { value: 'LABOUR', label: 'Labour / Work' },
@@ -11,7 +11,7 @@ const ITEM_TYPES = [
   { value: 'OTHER', label: 'Other / Consumable' }
 ];
 
-const EstimateManager = ({ bookingId, isCustomer, isProvider, isAdmin, onBookingUpdated }) => {
+const EstimateManager = ({ bookingId, isCustomer, isProvider, isAdmin, onBookingUpdated, bookingInspectionNotes, serviceName }) => {
   const [estimates, setEstimates] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,6 +27,49 @@ const EstimateManager = ({ bookingId, isCustomer, isProvider, isAdmin, onBooking
   // Rejection Modal
   const [rejectModal, setRejectModal] = useState({ isOpen: false, estimateId: null, reason: '' });
   const [rejecting, setRejecting] = useState(false);
+
+  // AI Estimate Assist (Feature 2) — advisory only
+  const [aiAssistLoading, setAiAssistLoading] = useState(false);
+  const [aiAssistResult, setAiAssistResult] = useState(null);
+  const [aiAssistError, setAiAssistError] = useState('');
+
+  const handleAiAssist = async () => {
+    const inputNotes = notes.trim() || bookingInspectionNotes || '';
+    if (!inputNotes) {
+      setAiAssistError('Please enter inspection notes first, or ensure the booking has inspection details recorded.');
+      return;
+    }
+    setAiAssistLoading(true);
+    setAiAssistError('');
+    try {
+      const res = await aiAssistEstimate(inputNotes, serviceName || '');
+      if (res?.data) {
+        setAiAssistResult(res.data);
+      } else {
+        setAiAssistError('AI assistant returned no result. You can continue manually.');
+      }
+    } catch (err) {
+      console.warn('[EstimateManager] AI assist skipped:', err.message);
+      setAiAssistError('AI assistant temporarily unavailable. Please fill in items manually.');
+    } finally {
+      setAiAssistLoading(false);
+    }
+  };
+
+  const applyAiSuggestedItems = () => {
+    if (!aiAssistResult?.suggestedItems?.length) return;
+    const mapped = aiAssistResult.suggestedItems.map((s) => ({
+      description: s.description || '',
+      type: s.type || 'OTHER',
+      quantity: 1,
+      unitPrice: ''
+    }));
+    setItems(mapped);
+    if (aiAssistResult.inspectionSummary && !notes.trim()) {
+      setNotes(aiAssistResult.inspectionSummary);
+    }
+    setAiAssistResult(null);
+  };
 
   const fetchEstimates = async () => {
     try {
@@ -439,9 +482,25 @@ const EstimateManager = ({ bookingId, isCustomer, isProvider, isAdmin, onBooking
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              Scope / Diagnostic Notes
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                Scope / Diagnostic Notes
+              </label>
+              {(isProvider || isAdmin) && (
+                <button
+                  type="button"
+                  onClick={handleAiAssist}
+                  disabled={aiAssistLoading}
+                  className="text-[11px] font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded flex items-center gap-1 transition-colors"
+                >
+                  {aiAssistLoading ? (
+                    <><span className="animate-spin inline-block text-[10px]">⚙️</span><span>Analyzing...</span></>
+                  ) : (
+                    <><span>✨</span><span>AI Assist (Advisory)</span></>
+                  )}
+                </button>
+              )}
+            </div>
             <textarea
               rows={2}
               value={notes}
@@ -449,6 +508,44 @@ const EstimateManager = ({ bookingId, isCustomer, isProvider, isAdmin, onBooking
               placeholder="e.g. Found damaged capacitor needing replacement..."
               className="w-full px-3 py-2 text-xs rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800"
             />
+
+            {aiAssistError && (
+              <div className="mt-1.5 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-[11px] rounded flex justify-between items-center">
+                <span>{aiAssistError}</span>
+                <button type="button" onClick={() => setAiAssistError('')} className="text-amber-500 hover:text-amber-700 ml-2 text-xs">✕</button>
+              </div>
+            )}
+
+            {aiAssistResult && (
+              <div className="mt-2 p-3 bg-gradient-to-r from-indigo-50/80 to-purple-50/80 border border-indigo-200 rounded-lg text-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-900 flex items-center gap-1">✨ AI Estimate Suggestions <span className="text-[9px] font-normal text-indigo-500 uppercase tracking-wide">(Advisory Only)</span></span>
+                  <button type="button" onClick={() => setAiAssistResult(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                </div>
+                {aiAssistResult.inspectionSummary && (
+                  <p className="text-slate-700 italic">"{aiAssistResult.inspectionSummary}"</p>
+                )}
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wide">Suggested Line Items:</p>
+                  {aiAssistResult.suggestedItems?.map((s, i) => (
+                    <div key={i} className="flex items-start gap-2 text-[11px] text-slate-700">
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-indigo-100 text-indigo-700 shrink-0 mt-0.5">{s.type}</span>
+                      <span>{s.description}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-2 flex items-center justify-between border-t border-indigo-100">
+                  <span className="text-[10px] text-slate-400 italic">Review items carefully. AI does not set prices.</span>
+                  <button
+                    type="button"
+                    onClick={applyAiSuggestedItems}
+                    className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-medium transition-colors"
+                  >
+                    Apply to Estimate
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pricing Preview Box */}

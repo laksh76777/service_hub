@@ -38,9 +38,10 @@ const ReviewCard = ({ booking, isCustomer }) => {
       const res = await createReview({
         bookingId: booking._id,
         rating,
+        review: comment,
         comment
       });
-      setReview(res.data);
+      setReview(res.data || res.review);
       setComment('');
     } catch (err) {
       setError(err.message || 'Failed to submit review.');
@@ -49,7 +50,7 @@ const ReviewCard = ({ booking, isCustomer }) => {
     }
   };
 
-  const isCompleted = booking?.status === 'COMPLETED';
+  const isCompleted = ['COMPLETED', 'CUSTOMER_CONFIRMED', 'WORK_COMPLETED', 'INVOICED'].includes(booking?.status);
 
   return (
     <Card className="p-6">

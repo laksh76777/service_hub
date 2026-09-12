@@ -54,23 +54,23 @@ export const getCategoryById = (id) => api.get(`/categories/${id}`);
 export const getServices = (params = {}) => api.get('/services', { params });
 export const getServiceById = (id) => api.get(`/services/${id}`);
 
-// Public Verified Providers Directory
-export const getProviders = (params = {}) => api.get('/providers', { params });
-export const getProviderById = (id) => api.get(`/providers/${id}`);
+// Public Verified Technicians Directory
+export const getTechnicians = (params = {}) => api.get('/technicians', { params });
+export const getTechnicianById = (id) => api.get(`/technicians/${id}`);
+export const getProviders = (params = {}) => api.get('/technicians', { params });
+export const getProviderById = (id) => api.get(`/technicians/${id}`);
 
-// Provider Portal Management
-export const getMyProviderProfile = () => api.get('/provider/profile');
-export const updateMyProviderProfile = (data) => api.patch('/provider/profile', data);
-export const getMyServices = () => api.get('/provider/services');
-export const addServiceOffering = (data) => api.post('/provider/services', data);
-export const updateServiceOffering = (serviceId, data) => api.patch(`/provider/services/${serviceId}`, data);
-export const removeServiceOffering = (serviceId) => api.delete(`/provider/services/${serviceId}`);
+// Technician Portal Management
+export const getMyTechnicianProfile = () => api.get('/technician/profile');
+export const updateMyTechnicianProfile = (data) => api.patch('/technician/profile', data);
+export const getMyProviderProfile = () => api.get('/technician/profile');
+export const updateMyProviderProfile = (data) => api.patch('/technician/profile', data);
+export const getMyServices = () => api.get('/technician/services');
+export const addServiceOffering = (data) => api.post('/technician/services', data);
+export const updateServiceOffering = (serviceId, data) => api.patch(`/technician/services/${serviceId}`, data);
+export const removeServiceOffering = (serviceId) => api.delete(`/technician/services/${serviceId}`);
 
-// Admin Moderation
-export const adminGetProviders = (params = {}) => api.get('/admin/providers', { params });
-export const adminUpdateProviderStatus = (id, data) => api.patch(`/admin/providers/${id}/status`, data);
-export const adminCreateCategory = (data) => api.post('/categories', data);
-export const adminCreateService = (data) => api.post('/services', data);
+// Admin Moderation APIs located at bottom of file
 
 // Booking APIs
 export const createBooking = (data) => api.post('/bookings', data);
@@ -120,11 +120,13 @@ export const getPaymentById = (paymentId) => api.get(`/payments/${paymentId}`);
 // Warranty APIs (Phase 9)
 export const createWarranty = (data) => api.post('/warranties', data);
 export const getBookingWarranty = (bookingId) => api.get(`/warranties/booking/${bookingId}`);
+export const getWarrantyById = (warrantyId) => api.get(`/warranties/${warrantyId}`);
 export const createWarrantyClaim = (warrantyId, data) => api.post(`/warranties/${warrantyId}/claims`, data);
 export const updateWarrantyClaimStatus = (claimId, data) => api.patch(`/warranties/claims/${claimId}/status`, data);
 
 // Dispute APIs (Phase 9)
 export const createDispute = (data) => api.post('/disputes', data);
+export const getDisputes = (params = {}) => api.get('/disputes', { params });
 export const getBookingDispute = (bookingId) => api.get(`/disputes/booking/${bookingId}`);
 export const getDisputeById = (disputeId) => api.get(`/disputes/${disputeId}`);
 export const respondToDispute = (disputeId, data) => api.post(`/disputes/${disputeId}/respond`, data);
@@ -133,6 +135,7 @@ export const resolveDispute = (disputeId, data) => api.patch(`/disputes/${disput
 // Review APIs (Phase 9)
 export const createReview = (data) => api.post('/reviews', data);
 export const getBookingReview = (bookingId) => api.get(`/reviews/booking/${bookingId}`);
+export const getTechnicianReviews = (technicianId) => api.get(`/reviews/provider/${technicianId}`);
 export const getProviderReviews = (providerId) => api.get(`/reviews/provider/${providerId}`);
 
 // Notification APIs (Phase 9)
@@ -140,8 +143,40 @@ export const getNotifications = (params = {}) => api.get('/notifications', { par
 export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
 
-// AI Classification API (Phase 11)
+// AI APIs
+// Feature 1: Customer problem description classification (no auth required)
 export const classifyServiceRequest = (description) => api.post('/ai/classify-request', { description });
+// Feature 2: Technician estimate assistance (auth: TECHNICIAN | ADMIN)
+export const aiAssistEstimate = (inspectionNotes, serviceName = '') =>
+  api.post('/ai/assist-estimate', { inspectionNotes, serviceName });
+// Feature 3: Admin platform summary (auth: ADMIN)
+export const adminAiSummary = (summaryType, overviewData = {}) =>
+  api.post('/ai/admin-summary', { summaryType, overview: overviewData });
+
+
+// Admin Console APIs
+export const adminGetOverview = () => api.get('/admin/overview');
+export const adminGetStats = () => api.get('/admin/overview');
+export const adminGetCustomers = (params = {}) => api.get('/admin/customers', { params });
+export const adminGetCustomerDetail = (id) => api.get(`/admin/customers/${id}`);
+export const adminGetTechnicians = (params = {}) => api.get('/admin/technicians', { params });
+export const adminGetProviders = (params = {}) => api.get('/admin/technicians', { params });
+export const adminUpdateTechnicianStatus = (id, data) => api.patch(`/admin/technicians/${id}/status`, data);
+export const adminUpdateProviderStatus = (id, data) => api.patch(`/admin/technicians/${id}/status`, data);
+export const adminGetServices = () => api.get('/admin/services');
+export const adminCreateService = (data) => api.post('/admin/services', data);
+export const adminUpdateService = (id, data) => api.put(`/admin/services/${id}`, data);
+export const adminToggleServiceStatus = (id) => api.patch(`/admin/services/${id}/status`);
+export const adminGetBookings = (params = {}) => api.get('/admin/bookings', { params });
+export const adminGetBookingDetail = (id) => api.get(`/admin/bookings/${id}`);
+export const adminGetPayments = () => api.get('/admin/payments');
+export const adminGetInvoices = () => api.get('/admin/invoices');
+export const adminGetReviews = () => api.get('/admin/reviews');
+export const adminGetDisputes = () => api.get('/admin/disputes');
+export const adminGetReports = () => api.get('/admin/reports');
+
+// Demo Accounts API
+export const getDemoAccounts = () => api.get('/test/demo-accounts');
 
 export default api;
 

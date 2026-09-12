@@ -61,10 +61,12 @@ const BookingDetailPage = () => {
 
   const isCustomer =
     booking?.customerId?._id?.toString() === mongoUser?._id?.toString() ||
-    mongoUser?.role === 'CUSTOMER';
-  const isProvider =
+    booking?.customerId?.toString() === mongoUser?._id?.toString();
+  const isTechnician =
+    booking?.technicianId?._id?.toString() === mongoUser?._id?.toString() ||
     booking?.providerId?._id?.toString() === mongoUser?._id?.toString() ||
-    mongoUser?.role === 'PROVIDER';
+    booking?.technicianId?.toString() === mongoUser?._id?.toString() ||
+    booking?.providerId?.toString() === mongoUser?._id?.toString();
   const isAdmin = mongoUser?.role === 'ADMIN';
 
   const handleOpenAction = (targetStatus, title, prompt, requireReason = false, reasonPlaceholder = '') => {
@@ -158,21 +160,395 @@ const BookingDetailPage = () => {
       case 'ACCEPTED':
       case 'SCHEDULED':
         return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'TECHNICIAN_ARRIVED':
-      case 'IN_PROGRESS':
+      case 'INSPECTION':
+      case 'ESTIMATE_PENDING':
+        return 'bg-cyan-100 text-cyan-800 border-cyan-300';
+      case 'ESTIMATE_SUBMITTED':
+      case 'ESTIMATE_APPROVED':
+        return 'bg-violet-100 text-violet-800 border-violet-300';
+      case 'PAYMENT_PENDING':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'PAYMENT_SUCCESS':
+      case 'WORK_IN_PROGRESS':
         return 'bg-indigo-100 text-indigo-800 border-indigo-300';
-      case 'COMPLETION_PENDING':
+      case 'WORK_COMPLETED':
         return 'bg-purple-100 text-purple-800 border-purple-300';
-      case 'CUSTOMER_VERIFIED':
+      case 'CUSTOMER_CONFIRMED':
+      case 'INVOICED':
       case 'COMPLETED':
         return 'bg-emerald-100 text-emerald-800 border-emerald-300';
+      case 'REJECTED':
+      case 'CANCELLED':
       case 'CANCELLED_BY_CUSTOMER':
       case 'CANCELLED_BY_PROVIDER':
         return 'bg-red-100 text-red-800 border-red-300';
-      case 'DISPUTED':
-        return 'bg-rose-100 text-rose-800 border-rose-300';
       default:
         return 'bg-slate-100 text-slate-800 border-slate-300';
+    }
+  };
+
+  const renderStateBannerAndActions = () => {
+    const techName = booking.technicianId?.name || booking.providerId?.name || 'Assigned Technician';
+    const amount = booking.pricing?.finalTotal || booking.pricing?.estimatedTotal || 0;
+
+    switch (booking.status) {
+      case 'REQUESTED':
+        return (
+          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <span>⏳</span> Waiting for technician response
+              </div>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {isCustomer
+                  ? `Your request was sent directly to ${techName}. You will be notified once they accept.`
+                  : `Customer ${booking.customerId?.name || ''} requested service. Please review and respond.`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {(isTechnician || isAdmin) && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-700 hover:bg-red-50"
+                    onClick={() => handleOpenAction('REJECTED', 'Reject Service Request', 'Please provide a mandatory reason for declining this request:', true, 'e.g. Fully booked, outside service area')}
+                  >
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => handleOpenAction('ACCEPTED', 'Accept Service Request', `Accept this service request and unlock customer full address?`)}
+                  >
+                    Accept
+                  </Button>
+                </>
+              )}
+              {isCustomer && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 text-red-700 hover:bg-red-50"
+                  onClick={() => handleOpenAction('CANCELLED', 'Cancel Request', 'Please state reason for cancellation:', true)}
+                >
+                  Cancel Request
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'ACCEPTED':
+        return (
+          <div className="p-5 rounded-2xl bg-blue-50 border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-blue-900 flex items-center gap-2">
+                <span>✓</span> Technician accepted your request
+              </div>
+              <p className="text-xs text-blue-700 mt-0.5">
+                {isCustomer
+                  ? `${techName} accepted your request. Preparing for on-site inspection & scheduling.`
+                  : `You accepted this request. Full customer address is now unlocked.`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {(isTechnician || isAdmin) && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => handleOpenAction('SCHEDULED', 'Confirm Schedule', 'Confirm this appointment time slot with the customer?')}
+                >
+                  Confirm Schedule
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+
+      case 'REJECTED':
+        return (
+          <div className="p-5 rounded-2xl bg-red-50 border border-red-200 mb-6 shadow-sm">
+            <div className="text-sm font-bold text-red-900 flex items-center gap-2">
+              <span>✕</span> Request Declined by Technician
+            </div>
+            <p className="text-xs text-red-700 mt-1">
+              Reason provided: <span className="font-semibold italic">"{booking.rejectionReason || 'Technician unavailable at requested slot'}"</span>
+            </p>
+            {isCustomer && (
+              <div className="mt-3">
+                <Link to="/services">
+                  <Button size="sm" variant="primary">
+                    Find Another Technician &rarr;
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'SCHEDULED':
+        return (
+          <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-indigo-900">
+                📅 Appointment Confirmed
+              </div>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                Scheduled for {new Date(booking.scheduledDate).toLocaleDateString('en-IN')} ({booking.preferredTimeSlot || 'Standard hours'}).
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleOpenAction('INSPECTION', 'Start Inspection', 'Check in on-site to start diagnostic inspection?')}
+              >
+                Start Inspection
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'INSPECTION':
+        return (
+          <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-cyan-900">
+                🔍 On-Site Diagnostic Inspection
+              </div>
+              <p className="text-xs text-cyan-700 mt-0.5">
+                {isCustomer
+                  ? `${techName} is conducting on-site diagnostic inspection.`
+                  : 'Diagnostic inspection underway. Prepare and submit estimate below.'}
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const estElem = document.getElementById('estimate-manager-section');
+                  if (estElem) estElem.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Submit Estimate &darr;
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'ESTIMATE_PENDING':
+        return (
+          <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-cyan-900">
+                📝 Estimate Pending
+              </div>
+              <p className="text-xs text-cyan-700 mt-0.5">
+                {isCustomer
+                  ? 'Technician is drafting scope and parts pricing for your approval.'
+                  : 'Draft scope and pricing in the Estimate section below.'}
+              </p>
+            </div>
+          </div>
+        );
+
+      case 'ESTIMATE_SUBMITTED':
+        return (
+          <div className="p-5 rounded-2xl bg-violet-50 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-violet-900">
+                📋 Review Estimate
+              </div>
+              <p className="text-xs text-violet-700 mt-0.5">
+                {isCustomer
+                  ? 'Technician submitted an estimate. Please review and approve.'
+                  : 'Waiting for customer approval of submitted estimate.'}
+              </p>
+            </div>
+            {isCustomer && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const estElem = document.getElementById('estimate-manager-section');
+                  if (estElem) estElem.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Review Estimate &darr;
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'ESTIMATE_APPROVED':
+        return (
+          <div className="p-5 rounded-2xl bg-violet-50 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-violet-900">
+                ✓ Estimate Approved
+              </div>
+              <p className="text-xs text-violet-700 mt-0.5">
+                Estimate approved for ₹{amount}. Ready for payment / work.
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleOpenAction('PAYMENT_PENDING', 'Request Payment', 'Request payment from the customer before initiating work?')}
+              >
+                Proceed to Payment
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'PAYMENT_PENDING':
+        return (
+          <div className="p-5 rounded-2xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-orange-900">
+                💳 Payment Required
+              </div>
+              <p className="text-xs text-orange-700 mt-0.5">
+                Amount payable: <span className="font-extrabold text-sm text-slate-900">₹{amount}</span>
+              </p>
+            </div>
+            {isCustomer && (
+              <Link to={`/checkout/${booking._id}`}>
+                <Button size="sm" variant="primary" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  Pay ₹{amount} Now &rarr;
+                </Button>
+              </Link>
+            )}
+          </div>
+        );
+
+      case 'PAYMENT_SUCCESS':
+        return (
+          <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-emerald-900">
+                ✓ Payment Verified
+              </div>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Payment completed. Technician will start work.
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleOpenAction('WORK_IN_PROGRESS', 'Start Work', 'Commence work on this service order?')}
+              >
+                Start Work (In Progress)
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'WORK_IN_PROGRESS':
+        return (
+          <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-indigo-900">
+                ⚡ Work in Progress
+              </div>
+              <p className="text-xs text-indigo-700 mt-0.5">
+                {isCustomer
+                  ? 'Technician is actively working on your repair.'
+                  : 'Perform service work. Click below once complete.'}
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                className="bg-purple-600 hover:bg-purple-700"
+                onClick={() => handleOpenAction('WORK_COMPLETED', 'Submit Work Completed', 'Have you finished all work scope?')}
+              >
+                Mark Work Completed
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'WORK_COMPLETED':
+        return (
+          <div className="p-5 rounded-2xl bg-purple-50 border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-purple-900">
+                🏁 Work Completed
+              </div>
+              <p className="text-xs text-purple-700 mt-0.5">
+                {isCustomer
+                  ? 'Technician completed the repair. Please inspect and confirm.'
+                  : 'Work submitted. Awaiting customer confirmation.'}
+              </p>
+            </div>
+            {isCustomer && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={() => handleOpenAction('CUSTOMER_CONFIRMED', 'Confirm Completion', 'Confirm that service was completed to your satisfaction?')}
+                >
+                  Confirm Completion
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'CUSTOMER_CONFIRMED':
+        return (
+          <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+            <div>
+              <div className="text-sm font-bold text-emerald-900">
+                ✓ Customer Confirmed Completion
+              </div>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                Work confirmed! Generate final invoice.
+              </p>
+            </div>
+            {(isTechnician || isAdmin) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => handleOpenAction('INVOICED', 'Generate Final Invoice', 'Generate formal tax invoice and activate customer warranty?')}
+              >
+                Generate Final Invoice
+              </Button>
+            )}
+          </div>
+        );
+
+      case 'INVOICED':
+      case 'COMPLETED':
+        return (
+          <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 mb-6 shadow-sm">
+            <div className="text-sm font-bold text-emerald-900 flex items-center gap-2">
+              <span>🎉</span> Service Invoiced & Completed
+            </div>
+            <p className="text-xs text-emerald-700 mt-0.5">
+              Official invoice and 30-day service warranty protection are active below.
+            </p>
+          </div>
+        );
+
+      case 'CANCELLED':
+        return (
+          <div className="p-5 rounded-2xl bg-slate-100 border border-slate-300 text-slate-700 mb-6 shadow-sm">
+            <div className="text-sm font-bold">Booking Cancelled</div>
+            <p className="text-xs text-slate-500 mt-0.5">This service booking was cancelled.</p>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -211,168 +587,25 @@ const BookingDetailPage = () => {
           </p>
         </div>
 
-        {/* Action Controls Bar */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Provider specific actions */}
-          {(isProvider || isAdmin) && (
-            <>
-              {booking.status === 'REQUESTED' && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleOpenAction('ACCEPTED', 'Accept Service Request', 'Are you ready to accept this customer job and proceed to scheduling?')}
-                  >
-                    Accept Request
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-50"
-                    onClick={() => handleOpenAction('CANCELLED_BY_PROVIDER', 'Decline Request', 'Provide a brief reason for declining this request:', true, 'e.g. Fully booked on requested date, outside immediate zone')}
-                  >
-                    Decline
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setNewDate(new Date(booking.scheduledDate).toISOString().split('T')[0]);
-                      setIsRescheduleOpen(true);
-                    }}
-                  >
-                    Propose Different Time
-                  </Button>
-                </>
-              )}
-
-              {booking.status === 'ACCEPTED' && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleOpenAction('SCHEDULED', 'Confirm Schedule', 'Confirm this appointment time slot with the customer?')}
-                  >
-                    Confirm Schedule
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setNewDate(new Date(booking.scheduledDate).toISOString().split('T')[0]);
-                      setIsRescheduleOpen(true);
-                    }}
-                  >
-                    Reschedule
-                  </Button>
-                </>
-              )}
-
-              {booking.status === 'SCHEDULED' && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    onClick={() => handleOpenAction('TECHNICIAN_ARRIVED', 'Mark Arrived on Site', 'Check in to notify the customer that technician has arrived at the property?')}
-                  >
-                    Check In (Arrived)
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setNewDate(new Date(booking.scheduledDate).toISOString().split('T')[0]);
-                      setIsRescheduleOpen(true);
-                    }}
-                  >
-                    Reschedule
-                  </Button>
-                </>
-              )}
-
-              {booking.status === 'TECHNICIAN_ARRIVED' && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => handleOpenAction('IN_PROGRESS', 'Start Work', 'Commence work on this service order?')}
-                >
-                  Start Work (In Progress)
-                </Button>
-              )}
-
-              {booking.status === 'IN_PROGRESS' && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => handleOpenAction('COMPLETION_PENDING', 'Submit for Customer Verification', 'Have you completed the job scope and are ready for customer inspection/sign-off?')}
-                >
-                  Submit for Customer Sign-off
-                </Button>
-              )}
-            </>
-          )}
-
-          {/* Customer specific actions */}
-          {(isCustomer || isAdmin) && (
-            <>
-              {['REQUESTED', 'ACCEPTED', 'SCHEDULED'].includes(booking.status) && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-red-300 text-red-700 hover:bg-red-50"
-                    onClick={() => handleOpenAction('CANCELLED_BY_CUSTOMER', 'Cancel Service Booking', 'Please let us know why you wish to cancel:', true, 'e.g. Problem already resolved, scheduling conflict')}
-                  >
-                    Cancel Booking
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => {
-                      setNewDate(new Date(booking.scheduledDate).toISOString().split('T')[0]);
-                      setIsRescheduleOpen(true);
-                    }}
-                  >
-                    Request Reschedule
-                  </Button>
-                </>
-              )}
-
-              {booking.status === 'COMPLETION_PENDING' && (
-                <>
-                  <Button
-                    size="sm"
-                    variant="primary"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => handleOpenAction('CUSTOMER_VERIFIED', 'Verify & Approve Work', 'Verify that the technician completed the service satisfactorily to your standards?')}
-                  >
-                    Verify & Approve Work
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-rose-300 text-rose-700 hover:bg-rose-50"
-                    onClick={() => handleOpenAction('DISPUTED', 'Report Dispute / Quality Issue', 'Please describe the problem with the completed work:', true, 'e.g. Leak persists, cleanup incomplete')}
-                  >
-                    Report Issue / Dispute
-                  </Button>
-                </>
-              )}
-
-              {booking.status === 'CUSTOMER_VERIFIED' && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={() => handleOpenAction('COMPLETED', 'Finalize Service Order', 'Complete and finalize this booking record?')}
-                >
-                  Finalize (Completed)
-                </Button>
-              )}
-            </>
+          {/* Reschedule button allowed during early stages */}
+          {['REQUESTED', 'ACCEPTED', 'SCHEDULED'].includes(booking.status) && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setNewDate(new Date(booking.scheduledDate).toISOString().split('T')[0]);
+                setIsRescheduleOpen(true);
+              }}
+            >
+              Reschedule Date/Time
+            </Button>
           )}
         </div>
       </div>
+
+      {/* State-Driven Status & Action Banner */}
+      {renderStateBannerAndActions()}
 
       {/* Interactive Timeline */}
       <div className="mb-6">
@@ -443,26 +676,30 @@ const BookingDetailPage = () => {
           </Card>
 
           {/* Phase 7: Estimates & Scope Approvals */}
-          <EstimateManager
-            bookingId={booking._id}
-            isCustomer={isCustomer}
-            isProvider={isProvider}
-            isAdmin={isAdmin}
-            onBookingUpdated={fetchBooking}
-          />
+          <div id="estimate-manager-section">
+            <EstimateManager
+              bookingId={booking._id}
+              isCustomer={isCustomer}
+              isProvider={isTechnician}
+              isAdmin={isAdmin}
+              onBookingUpdated={fetchBooking}
+              bookingInspectionNotes={booking.jobExecution?.inspectionNotes || booking.notes || ''}
+              serviceName={booking.serviceId?.name || ''}
+            />
+          </div>
 
           {/* Phase 6: MongoDB GridFS Work Evidence Gallery */}
           <WorkEvidenceGallery
             bookingId={booking._id}
-            canUpload={isCustomer || isProvider || isAdmin}
-            canDelete={isProvider || isAdmin}
+            canUpload={isCustomer || isTechnician || isAdmin}
+            canDelete={isTechnician || isAdmin}
           />
 
           {/* Phase 7: Final Tax Invoice & PDF Download */}
           <InvoiceCard
             booking={booking}
             isCustomer={isCustomer}
-            isProvider={isProvider}
+            isProvider={isTechnician}
             isAdmin={isAdmin}
             onInvoiceCreated={fetchBooking}
           />
@@ -477,7 +714,7 @@ const BookingDetailPage = () => {
           <WarrantyCard
             booking={booking}
             isCustomer={isCustomer}
-            isProvider={isProvider}
+            isProvider={isTechnician}
             isAdmin={isAdmin}
           />
 
@@ -491,7 +728,7 @@ const BookingDetailPage = () => {
           <DisputeCard
             booking={booking}
             isCustomer={isCustomer}
-            isProvider={isProvider}
+            isProvider={isTechnician}
             isAdmin={isAdmin}
             onDisputeUpdated={fetchBooking}
           />
@@ -518,17 +755,17 @@ const BookingDetailPage = () => {
 
         {/* Right 1 Col: Parties Involved & Pricing */}
         <div className="space-y-6">
-          <Card title="Assigned Contractor">
+          <Card title="Assigned Technician">
             <div className="space-y-2 text-xs">
               <div className="font-bold text-slate-900 text-sm">
-                {booking.providerId?.name || 'Verified Provider'}
+                {booking.technicianId?.name || booking.providerId?.name || 'Verified Technician'}
               </div>
-              <p className="text-slate-500">{booking.providerId?.email}</p>
-              {booking.providerId?.phone && (
-                <p className="text-slate-600 font-medium">📞 {booking.providerId.phone}</p>
+              <p className="text-slate-500">{booking.technicianId?.email || booking.providerId?.email}</p>
+              {(booking.technicianId?.phone || booking.providerId?.phone) && (
+                <p className="text-slate-600 font-medium">📞 {booking.technicianId?.phone || booking.providerId?.phone}</p>
               )}
               <div className="pt-2">
-                <Link to={`/providers/${booking.providerId?._id}`}>
+                <Link to={`/technicians/${booking.technicianId?._id || booking.providerId?._id}`}>
                   <span className="text-xs text-blue-600 font-bold hover:underline">
                     View Public Profile →
                   </span>

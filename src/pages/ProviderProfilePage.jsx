@@ -113,7 +113,7 @@ const ProviderProfilePage = () => {
 
       setFeedback({
         type: 'success',
-        message: 'Provider profile, service area, and working schedule updated successfully!'
+        message: 'Technician profile, service area, and working schedule updated successfully!'
       });
     } catch (err) {
       setFeedback({
@@ -136,12 +136,12 @@ const ProviderProfilePage = () => {
           <span className="text-xs font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
             Profile Settings
           </span>
-          <h1 className="text-3xl font-black text-slate-900 mt-2">Provider Business Profile</h1>
+          <h1 className="text-3xl font-black text-slate-900 mt-2">Technician Profile</h1>
           <p className="text-slate-500 text-xs mt-1">
             Configure your trade credentials, geographic coverage zones, and working schedule.
           </p>
         </div>
-        <Link to="/provider/dashboard">
+        <Link to="/technician/dashboard">
           <Button variant="outline" size="sm">
             &larr; Back to Dashboard
           </Button>
@@ -252,10 +252,11 @@ const ProviderProfilePage = () => {
         </Card>
 
         {/* Section 3: Availability & Operating Schedule */}
-        <Card
-          title="3. Basic Availability & Hours"
-          subtitle="Let clients know your working schedule and emergency availability"
-        >
+        <div id="availability">
+          <Card
+            title="3. Basic Availability & Hours"
+            subtitle="Let clients know your working schedule and emergency availability"
+          >
           <div className="space-y-5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-2">
@@ -318,16 +319,17 @@ const ProviderProfilePage = () => {
             </div>
           </div>
         </Card>
+      </div>
 
         {/* Submit Bar */}
         <div className="flex justify-end gap-3 pt-4">
-          <Link to="/provider/dashboard">
+          <Link to="/technician/dashboard">
             <Button type="button" variant="secondary">
               Cancel
             </Button>
           </Link>
           <Button type="submit" variant="primary" disabled={saving}>
-            {saving ? 'Saving Changes...' : 'Save Provider Profile'}
+            {saving ? 'Saving Changes...' : 'Save Technician Profile'}
           </Button>
         </div>
       </form>

@@ -115,18 +115,14 @@ const DemoCheckoutPage = () => {
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 sm:px-6">
-      {/* Demo Gateway Banner */}
-      <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
-        <span className="text-2xl">⚠️</span>
-        <div className="text-xs text-amber-800 dark:text-amber-200">
-          <strong className="block text-sm font-bold text-amber-900 dark:text-amber-100 mb-0.5">
-            ServiceHub Demo Payment Gateway
-          </strong>
-          <span>
-            Demo Mode — No real money will be charged. This sandbox simulates the payment verification lifecycle
-            for end-to-end platform demonstration.
-          </span>
-        </div>
+      {/* Demo Gateway Header & Banner */}
+      <div className="mb-6 p-5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-center space-y-1">
+        <h1 className="text-2xl font-extrabold text-amber-950 dark:text-amber-100">
+          ServiceHub Demo Payment
+        </h1>
+        <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+          Demo Mode — No real money will be charged.
+        </p>
       </div>
 
       {paymentResult?.success ? (
@@ -207,20 +203,34 @@ const DemoCheckoutPage = () => {
                 </div>
 
                 <div>
-                  <span className="text-gray-500 block text-[11px]">Booking Reference</span>
+                  <span className="text-gray-500 block text-[11px]">Technician</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">
+                    {order?.technicianName || booking?.technicianId?.name || booking?.providerId?.name || 'Assigned Technician'}
+                  </span>
+                </div>
+
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Booking</span>
                   <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
-                    {order?.bookingNumber || booking?.bookingNumber}
+                    {order?.bookingNumber || booking?.bookingNumber || booking?._id}
                   </span>
                 </div>
 
                 {order?.invoiceNumber && (
                   <div>
-                    <span className="text-gray-500 block text-[11px]">Tax Invoice</span>
+                    <span className="text-gray-500 block text-[11px]">Invoice</span>
                     <span className="font-mono font-semibold text-gray-800 dark:text-gray-200">
                       {order.invoiceNumber}
                     </span>
                   </div>
                 )}
+
+                <div>
+                  <span className="text-gray-500 block text-[11px]">Currency</span>
+                  <span className="font-bold text-gray-800 dark:text-gray-200">
+                    {order?.currency || 'INR'}
+                  </span>
+                </div>
 
                 <div>
                   <span className="text-gray-500 block text-[11px]">Gateway Order ID</span>
@@ -231,10 +241,10 @@ const DemoCheckoutPage = () => {
 
                 <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-between items-baseline">
                   <span className="font-bold text-gray-700 dark:text-gray-300">
-                    Total Amount
+                    Amount
                   </span>
                   <span className="text-xl font-extrabold text-blue-600 dark:text-blue-400">
-                    ₹{order?.amount?.toLocaleString('en-IN')}
+                    ₹{order?.amount?.toLocaleString('en-IN')} {order?.currency || 'INR'}
                   </span>
                 </div>
               </div>
@@ -312,7 +322,7 @@ const DemoCheckoutPage = () => {
                   onClick={() => handleSimulatePayment('SUCCESS')}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md"
                 >
-                  <span>✓ Pay Successfully (₹{order?.amount?.toLocaleString('en-IN')})</span>
+                  Pay Successfully
                 </Button>
 
                 {/* Simulate Failed Payment */}
@@ -323,6 +333,7 @@ const DemoCheckoutPage = () => {
                       onChange={(e) => setFailureReasonChoice(e.target.value)}
                       className="w-full text-xs p-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
                     >
+                      <option value="Demo payment declined">Demo payment declined</option>
                       <option value="Card declined by issuing bank">Card declined by issuing bank</option>
                       <option value="Insufficient funds in account">Insufficient funds in account</option>
                       <option value="Bank server timeout">Bank server timeout</option>
@@ -342,15 +353,17 @@ const DemoCheckoutPage = () => {
                 </div>
 
                 {/* Cancel Payment */}
-                <div className="pt-2 text-center">
-                  <button
-                    type="button"
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    size="sm"
                     disabled={processing}
                     onClick={() => handleSimulatePayment('CANCELLED')}
-                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-medium underline"
+                    className="text-gray-600 hover:text-gray-900 border-gray-300 dark:text-gray-400 dark:border-gray-700 font-medium"
                   >
-                    Cancel Payment and Return to Booking
-                  </button>
+                    Cancel Payment
+                  </Button>
                 </div>
               </div>
             </Card>

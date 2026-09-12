@@ -4,6 +4,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Loading from '../components/common/Loading';
 import EmptyState from '../components/common/EmptyState';
+import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import {
   getMyProviderProfile,
@@ -22,6 +23,7 @@ const ProviderDashboardPage = () => {
   const [bookings, setBookings] = useState([]);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [bookingNotice, setBookingNotice] = useState('');
+  const [rejectModal, setRejectModal] = useState({ isOpen: false, bookingId: '', reason: '' });
 
   // Admin section state
   const isAdmin = mongoUser?.role === 'ADMIN';
@@ -110,7 +112,7 @@ const ProviderDashboardPage = () => {
   };
 
   if (loading) {
-    return <Loading fullPage text="Loading provider workspace..." />;
+    return <Loading fullPage text="Loading technician workspace..." />;
   }
 
   const status = profile?.status || 'PENDING';
@@ -122,15 +124,15 @@ const ProviderDashboardPage = () => {
       icon: '⏳',
       title: 'Verification In Progress',
       message:
-        'Your contractor application is under review by our admin verification team. Complete your profile and service offerings so we can approve your account. Unverified providers do not appear in public customer searches.'
+        'Your technician profile is under review by our admin verification team. Complete your profile and trade service offerings so we can approve your account. Unverified technicians do not appear in public customer discovery.'
     },
     VERIFIED: {
       bg: 'bg-emerald-50 border-emerald-200 text-emerald-900',
       badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
       icon: '✓',
-      title: 'Certified & Verified Contractor',
+      title: 'Certified & Verified Technician',
       message:
-        'Your account is verified! Your business profile and service offerings are actively listed in customer discovery searches across your configured service areas.'
+        'Your account is verified! Your technician profile and service offerings are actively listed in customer discovery searches across your configured service areas.'
     },
     REJECTED: {
       bg: 'bg-red-50 border-red-200 text-red-900',
@@ -138,7 +140,7 @@ const ProviderDashboardPage = () => {
       icon: '✕',
       title: 'Verification Needs Attention',
       message:
-        'Your verification was rejected or requires updated documentation. Please inspect your profile and upload valid licensing or insurance information.'
+        'Your verification was rejected or requires updated documentation. Please inspect your profile and upload valid trade licensing or identification.'
     },
     SUSPENDED: {
       bg: 'bg-rose-50 border-rose-200 text-rose-900',
@@ -146,14 +148,14 @@ const ProviderDashboardPage = () => {
       icon: '⚠',
       title: 'Account Suspended',
       message:
-        'Your provider privileges have been temporarily paused. Please contact administrator support to resolve pending compliance or dispute inquiries.'
+        'Your technician privileges have been temporarily paused. Please contact administrator support to resolve pending compliance or dispute inquiries.'
     }
   }[status] || {
     bg: 'bg-slate-50 border-slate-200 text-slate-900',
     badge: 'bg-slate-100 text-slate-800 border-slate-300',
     icon: 'ℹ',
     title: 'Status: ' + status,
-    message: 'Your provider profile status is currently ' + status
+    message: 'Your technician profile status is currently ' + status
   };
 
   const incomingRequests = bookings.filter((b) => b.status === 'REQUESTED');
@@ -176,28 +178,28 @@ const ProviderDashboardPage = () => {
               ? 'text-purple-600 bg-purple-50 border-purple-100'
               : 'text-blue-600 bg-blue-50 border-blue-100'
           }`}>
-            {isAdmin ? '👑 Admin Control Panel' : 'Provider Portal'}
+            {isAdmin ? '👑 Admin Platform Monitor' : 'Technician Portal'}
           </span>
           <h1 className="text-3xl font-black text-slate-900 mt-2">
             {isAdmin
               ? `Welcome, ${mongoUser?.name || user?.displayName || 'Admin'}`
-              : (profile?.businessName || `${user?.displayName}'s Business`)}
+              : (mongoUser?.name || profile?.businessName || 'Technician Workspace')}
           </h1>
           <p className="text-slate-500 text-xs mt-1">
             {isAdmin
-              ? 'Manage provider verifications, monitor bookings, handle disputes, and oversee the platform.'
+              ? 'Monitor technician verifications, inspect bookings, handle disputes, and oversee the platform.'
               : 'Manage your credentials, coverage areas, service offerings, and incoming customer booking requests.'}
           </p>
         </div>
 
         {!isAdmin && (
           <div className="flex gap-3">
-            <Link to="/provider/profile">
+            <Link to="/technician/profile">
               <Button variant="outline" size="sm">
                 Edit Profile
               </Button>
             </Link>
-            <Link to="/provider/services">
+            <Link to="/technician/services">
               <Button variant="primary" size="sm">
                 Manage Services ({profile?.servicesOffered?.length || 0})
               </Button>
@@ -213,7 +215,7 @@ const ProviderDashboardPage = () => {
         </div>
       )}
 
-      {/* Verification Status Banner — only shown to PROVIDER users */}
+      {/* Verification Status Banner — only shown to TECHNICIAN users */}
       {!isAdmin && (
         <div className={`p-6 rounded-2xl border ${statusBannerConfig.bg} shadow-sm`}>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -234,13 +236,13 @@ const ProviderDashboardPage = () => {
 
             <div className="flex-shrink-0">
               {status === 'VERIFIED' ? (
-                <Link to={`/providers/${profile?._id}`}>
+                <Link to={`/technicians/${profile?._id}`}>
                   <Button size="sm" variant="outline" className="bg-white/80">
                     View Public Profile
                   </Button>
                 </Link>
               ) : (
-                <Link to="/provider/profile">
+                <Link to="/technician/profile">
                   <Button size="sm" variant="primary">
                     Update Credentials
                   </Button>
@@ -287,7 +289,7 @@ const ProviderDashboardPage = () => {
       </div>
 
       {/* INCOMING SERVICE REQUESTS QUEUE */}
-      <div className="space-y-4">
+      <div id="requests" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black text-slate-900">Incoming Service Requests</h2>
@@ -325,18 +327,17 @@ const ProviderDashboardPage = () => {
                         variant="outline"
                         className="text-red-600 border-red-200 hover:bg-red-50"
                         onClick={() => {
-                          const r = prompt('Reason for declining request:');
-                          if (r) handleQuickStatusTransition(b._id, 'CANCELLED_BY_PROVIDER', r);
+                          setRejectModal({ isOpen: true, bookingId: b._id, reason: '' });
                         }}
                       >
-                        Decline
+                        Reject
                       </Button>
                       <Button
                         size="sm"
                         variant="primary"
-                        onClick={() => handleQuickStatusTransition(b._id, 'ACCEPTED', 'Provider accepted booking')}
+                        onClick={() => handleQuickStatusTransition(b._id, 'ACCEPTED', 'Technician accepted booking request')}
                       >
-                        Accept Request
+                        Accept
                       </Button>
                     </div>
                   </div>
@@ -370,7 +371,7 @@ const ProviderDashboardPage = () => {
       </div>
 
       {/* ACTIVE JOBS & SCHEDULED APPOINTMENTS */}
-      <div className="space-y-4 pt-4 border-t border-slate-200">
+      <div id="jobs" className="space-y-4 pt-4 border-t border-slate-200">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-black text-slate-900">Active Job Pipeline</h2>
@@ -534,6 +535,57 @@ const ProviderDashboardPage = () => {
           )}
         </div>
       )}
+
+      {/* Rejection Modal requiring mandatory reason */}
+      <Modal
+        isOpen={rejectModal.isOpen}
+        onClose={() => setRejectModal({ isOpen: false, bookingId: '', reason: '' })}
+        title="Reject Service Request"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            Please provide a clear reason for declining this request. The customer will be informed.
+          </p>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Reason for Rejection <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-red-500 outline-none"
+              rows={3}
+              placeholder="e.g., Unavailable at requested time, outside immediate trade expertise, fully booked..."
+              value={rejectModal.reason}
+              onChange={(e) => setRejectModal((prev) => ({ ...prev, reason: e.target.value }))}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRejectModal({ isOpen: false, bookingId: '', reason: '' })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (!rejectModal.reason.trim()) {
+                  alert('A reason is required to reject a booking request.');
+                  return;
+                }
+                const bId = rejectModal.bookingId;
+                const r = rejectModal.reason.trim();
+                setRejectModal({ isOpen: false, bookingId: '', reason: '' });
+                await handleQuickStatusTransition(bId, 'REJECTED', r);
+              }}
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

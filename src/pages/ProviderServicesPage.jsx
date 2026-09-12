@@ -199,7 +199,7 @@ const ProviderServicesPage = () => {
         </div>
 
         <div className="flex gap-3">
-          <Link to="/provider/dashboard">
+          <Link to="/technician/dashboard">
             <Button variant="outline" size="sm">
               &larr; Dashboard
             </Button>

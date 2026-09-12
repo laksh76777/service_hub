@@ -162,12 +162,12 @@ const ServicesPage = () => {
                   <div className="flex items-center gap-1.5">
                     <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-xs font-medium text-slate-600">
-                      {service.providersCount} Verified Pro{service.providersCount === 1 ? '' : 's'}
+                      {service.providersCount} Verified Technician{service.providersCount === 1 ? '' : 's'}
                     </span>
                   </div>
                   <Link to={`/services/${service._id}`}>
                     <Button size="sm" variant="primary">
-                      View Pros
+                      View Technicians
                     </Button>
                   </Link>
                 </div>
@@ -175,7 +175,7 @@ const ServicesPage = () => {
             >
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                  {service.description || 'Professional service by certified local contractors.'}
+                  {service.description || 'Professional service by certified local technicians.'}
                 </p>
 
                 <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">

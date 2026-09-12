@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
@@ -11,6 +11,14 @@ import { updateMe, getBookings } from '../services/api';
 
 const DashboardPage = () => {
   const { user, mongoUser, isEmailVerified, resendVerificationEmail, refreshUserProfile } = useAuth();
+  const navigate = useNavigate();
+
+  // Role guard: PROVIDER and ADMIN must use the Provider Cockpit
+  useEffect(() => {
+    if (mongoUser?.role === 'PROVIDER' || mongoUser?.role === 'ADMIN') {
+      navigate('/provider/dashboard', { replace: true });
+    }
+  }, [mongoUser, navigate]);
 
   const [activeTab, setActiveTab] = useState('bookings');
   const [bookings, setBookings] = useState([]);

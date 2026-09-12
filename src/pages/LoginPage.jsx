@@ -28,17 +28,23 @@ const LoginPage = () => {
   const [resetMessage, setResetMessage] = useState('');
   const [resetError, setResetError] = useState('');
 
-  const { login, resetPassword, isAuthenticated } = useAuth();
+  const { login, resetPassword, isAuthenticated, mongoUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  const from = location.state?.from?.pathname || null;
+
+  const getRoleDashboard = (role) => {
+    if (role === 'PROVIDER' || role === 'ADMIN') return '/provider/dashboard';
+    return '/dashboard';
+  };
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(from, { replace: true });
+    if (isAuthenticated && mongoUser) {
+      // If user was trying to access a specific page, honor it; otherwise role-based redirect
+      navigate(from || getRoleDashboard(mongoUser.role), { replace: true });
     }
-  }, [isAuthenticated, navigate, from]);
+  }, [isAuthenticated, mongoUser, navigate, from]);
 
   const handleQuickFill = (demoEmail) => {
     setEmail(demoEmail);
@@ -53,8 +59,9 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate(from, { replace: true });
+      const { profile } = await login(email, password);
+      const dest = from || getRoleDashboard(profile?.role || 'CUSTOMER');
+      navigate(dest, { replace: true });
     } catch (err) {
       let msg = 'Failed to sign in. Please check your credentials.';
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {

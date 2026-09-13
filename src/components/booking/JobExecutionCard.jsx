@@ -143,7 +143,7 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
             </div>
           )}
 
-          {status === 'COMPLETION_PENDING' && completionOtp?.code && (
+          {status === 'WORK_COMPLETED' && completionOtp?.code && (
             <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg border border-emerald-400/30">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
@@ -195,7 +195,7 @@ const JobExecutionCard = ({ booking, isCustomer, isProvider, isAdmin, onBookingU
             </Card>
           )}
 
-          {status === 'COMPLETION_PENDING' && (
+          {status === 'WORK_COMPLETED' && (
             <Card className="p-6 border-2 border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-950/20">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>

@@ -27,7 +27,23 @@ api.interceptors.request.use(
 
 // Response interceptor for unified error formatting
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const payload = response.data;
+    if (payload && typeof payload === 'object' && !('data' in payload)) {
+      try {
+        Object.defineProperty(payload, 'data', {
+          get() {
+            return this;
+          },
+          configurable: true,
+          enumerable: false
+        });
+      } catch {
+        // ignore if non-extensible
+      }
+    }
+    return payload;
+  },
   (error) => {
     const customError = {
       message: error.response?.data?.message || error.message || 'An unexpected error occurred',

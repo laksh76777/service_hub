@@ -34,8 +34,9 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
     setLoading(true);
     try {
       const res = await getMyProviderProfile();
-      if (res?.data?.profile) {
-        setProfile(res.data.profile);
+      const p = res?.profile || res?.data?.profile;
+      if (p) {
+        setProfile(p);
       }
     } catch (err) {
       console.error('Failed to load technician profile:', err);
@@ -48,9 +49,8 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
     setBookingsLoading(true);
     try {
       const res = await getBookings({ limit: 50 });
-      if (res?.data?.bookings) {
-        setBookings(res.data.bookings);
-      }
+      const list = res?.bookings || res?.data?.bookings || [];
+      setBookings(list);
     } catch (err) {
       console.error('Failed to load technician bookings:', err);
     } finally {
@@ -69,21 +69,21 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
     try {
       setBookingNotice('');
       const res = await updateBookingStatus(bookingId, { status: targetStatus, reason });
-      setBookingNotice(res.data.message || `Booking status updated to ${targetStatus}`);
-      loadBookings();
+      setBookingNotice(res?.message || res?.data?.message || `Booking status updated to ${targetStatus}`);
+      await loadBookings();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to update booking status.');
+      alert(err.response?.data?.message || err.data?.message || err.message || 'Failed to update booking status.');
     }
   };
 
   const handleStartWorkQuick = async (bookingId) => {
     try {
       setBookingNotice('');
-      await startWork(bookingId);
-      setBookingNotice('Service work started! Booking is now WORK_IN_PROGRESS.');
-      loadBookings();
+      const res = await startWork(bookingId);
+      setBookingNotice(res?.message || res?.data?.message || 'Service work started! Booking is now WORK_IN_PROGRESS.');
+      await loadBookings();
     } catch (err) {
-      alert(err.response?.data?.message || err.message || 'Failed to start service work.');
+      alert(err.response?.data?.message || err.data?.message || err.message || 'Failed to start service work.');
     }
   };
 
@@ -355,13 +355,13 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
       </section>
       )}
 
-      {/* 4. TODAY'S JOBS SECTION (Requirement 23) */}
-      {(activeTab === 'overview' || activeTab === 'jobs') && (
+      {/* 4. TODAY'S JOBS SECTION (Shown on Overview only to avoid confusion with Active Jobs pipeline) */}
+      {activeTab === 'overview' && (
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">Today's Schedule</h2>
-            <p className="text-xs text-slate-500">Appointments scheduled for today.</p>
+            <p className="text-xs text-slate-500">Appointments scheduled specifically for today ({new Date().toLocaleDateString('en-IN')}).</p>
           </div>
           <span className="text-xs font-bold text-slate-500">
             {todaysJobs.length} Today
@@ -369,8 +369,17 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
         </div>
 
         {todaysJobs.length === 0 ? (
-          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
-            No service jobs scheduled for today.
+          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>
+              <span className="font-bold text-slate-800">No service jobs scheduled specifically for today.</span>
+              <span className="block text-slate-400 mt-0.5">You have {activeJobs.length} active jobs in your pipeline awaiting inspection, estimates, or execution.</span>
+            </div>
+            <button
+              onClick={() => setActiveTab('jobs')}
+              className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold rounded-xl text-xs transition cursor-pointer"
+            >
+              View Active Jobs Pipeline ({activeJobs.length}) →
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -413,7 +422,7 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">Active Jobs Pipeline</h2>
-            <p className="text-xs text-slate-500">Ongoing diagnostics, estimates, and repair execution stages.</p>
+            <p className="text-xs text-slate-500">Manage jobs across inspection, estimate, demo payment, and repair execution.</p>
           </div>
           <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full w-fit">
             {activeJobs.length} In Pipeline
@@ -482,7 +491,31 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
                         ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
                       </span>
                       <div className="flex items-center gap-2">
-                        {b.status === 'PAYMENT_SUCCESS' ? (
+                        {b.status === 'ACCEPTED' || b.status === 'SCHEDULED' ? (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="primary" className="bg-blue-600 hover:bg-blue-700 font-bold text-xs">
+                              🔍 Start Inspection →
+                            </Button>
+                          </Link>
+                        ) : b.status === 'INSPECTION' ? (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="primary" className="bg-cyan-600 hover:bg-cyan-700 font-bold text-xs">
+                              📝 Enter Estimate →
+                            </Button>
+                          </Link>
+                        ) : ['ESTIMATE_PENDING', 'ESTIMATE_SUBMITTED'].includes(b.status) ? (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="outline" className="text-xs font-semibold text-slate-700">
+                              ⏳ Awaiting Approval →
+                            </Button>
+                          </Link>
+                        ) : b.status === 'PAYMENT_PENDING' ? (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="outline" className="text-amber-700 border-amber-300 bg-amber-50 text-xs font-semibold">
+                              💳 Awaiting Payment →
+                            </Button>
+                          </Link>
+                        ) : b.status === 'PAYMENT_SUCCESS' ? (
                           <Button
                             size="xs"
                             variant="primary"
@@ -493,8 +526,8 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
                           </Button>
                         ) : b.status === 'WORK_IN_PROGRESS' ? (
                           <Link to={`/technician/jobs/${b._id}#work-execution-section`}>
-                            <Button size="xs" variant="primary" className="bg-purple-600 hover:bg-purple-700 text-xs">
-                              Manage Work →
+                            <Button size="xs" variant="primary" className="bg-purple-600 hover:bg-purple-700 text-xs font-bold">
+                              🛠️ Complete Work →
                             </Button>
                           </Link>
                         ) : ['WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(b.status) ? (
@@ -506,7 +539,7 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
                         ) : (
                           <Link to={`/technician/jobs/${b._id}`}>
                             <Button size="xs" variant="primary" className="text-xs">
-                              Job Lifecycle →
+                              Manage Job →
                             </Button>
                           </Link>
                         )}

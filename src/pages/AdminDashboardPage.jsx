@@ -594,17 +594,19 @@ const AdminDashboardPage = ({ initialTab = 'overview' }) => {
   }, [reviews, searchTerm]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
       
       {/* Operations Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-950 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-800">
+      <div className="relative overflow-hidden flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-slate-950 text-white p-6 sm:p-8 rounded-[28px] shadow-xl border border-slate-800">
+        <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-cyan-400/10 to-transparent pointer-events-none" />
         <div>
-          <div className="inline-flex items-center gap-2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
-            🛡️ Platform Operations &amp; Oversight Console
+          <div className="inline-flex items-center gap-2 bg-cyan-400/10 text-cyan-200 border border-cyan-300/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+            Platform Operations &amp; Oversight Console
           </div>
           <h1 className="text-2xl sm:text-4xl font-black tracking-tight">System Control &amp; Moderation</h1>
           <p className="text-slate-400 text-xs sm:text-sm mt-1">
-            Logged in as <strong>{mongoUser?.email || 'abc@gmail.com'}</strong> • Role: <span className="text-purple-400 font-black">ADMIN</span>
+            Logged in as <strong>{mongoUser?.email || 'abc@gmail.com'}</strong> • Role: <span className="text-cyan-300 font-black">ADMIN</span>
           </p>
         </div>
 
@@ -612,7 +614,7 @@ const AdminDashboardPage = ({ initialTab = 'overview' }) => {
           <Button
             variant="outline"
             size="sm"
-            className="border-slate-700 text-white hover:bg-slate-800 text-xs"
+            className="!border-white/20 !bg-white/10 !text-white hover:!bg-white/20 hover:!border-white/30 text-xs"
             onClick={() => {
               loadOverview();
               if (activeTab === 'customers') loadCustomers();
@@ -633,42 +635,6 @@ const AdminDashboardPage = ({ initialTab = 'overview' }) => {
             🔄 Refresh Live Data
           </Button>
         </div>
-      </div>
-
-      {/* Navigation Tabs Bar */}
-      <div className="border-b border-slate-200 overflow-x-auto no-scrollbar pb-px">
-        <nav className="flex space-x-2 sm:space-x-3 min-w-max">
-          {[
-            { id: 'overview', label: '📊 Dashboard' },
-            { id: 'customers', label: '👥 Customers' },
-            { id: 'technicians', label: '🔧 Technicians' },
-            { id: 'services', label: '🛠️ Services' },
-            { id: 'bookings', label: '📅 Bookings' },
-            { id: 'payments', label: '💳 Payments' },
-            { id: 'invoices', label: '🧾 Invoices' },
-            { id: 'warranty', label: '🛡️ Warranty & Claims' },
-            { id: 'disputes', label: '⚖️ Disputes' },
-            { id: 'reviews', label: '⭐ Reviews' },
-            { id: 'reports', label: '📈 Reports' },
-            { id: 'profile', label: '👤 Profile' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                setActiveTab(tab.id);
-                window.location.hash = tab.id;
-              }}
-              className={`py-2.5 px-3.5 rounded-xl text-xs font-bold transition-all ${
-                activeTab === tab.id
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
       </div>
 
       {/* Global Quick Search Bar */}

@@ -266,15 +266,16 @@ const BookingModal = ({
       };
 
       const res = await createBooking(payload);
-      const newBooking = res.data.booking;
+      const newBooking = res?.booking || res?.data?.booking || res;
       const techName = selectedTechnician?.name || selectedTechnician?.businessName || 'the technician';
+      const bId = newBooking?._id || newBooking?.id || (typeof newBooking === 'string' ? newBooking : '');
 
       setRequestSuccess({
-        bookingId: newBooking._id,
+        bookingId: bId,
         technicianName: techName
       });
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to submit booking request.');
+      setError(err.response?.data?.message || err.data?.message || err.message || 'Failed to submit booking request.');
     } finally {
       setSubmitting(false);
     }

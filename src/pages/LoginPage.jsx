@@ -23,7 +23,7 @@ const LoginPage = () => {
   const [resetMessage, setResetMessage] = useState('');
   const [resetError, setResetError] = useState('');
 
-  const { login, resetPassword, isAuthenticated, mongoUser } = useAuth();
+  const { login, resetPassword, isAuthenticated, mongoUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -93,10 +93,10 @@ const LoginPage = () => {
 
   // If already authenticated, route to appropriate dashboard
   useEffect(() => {
-    if (isAuthenticated && mongoUser) {
+    if (!authLoading && isAuthenticated && mongoUser) {
       navigate(redirectParam || getRoleDashboard(mongoUser.role), { replace: true });
     }
-  }, [isAuthenticated, mongoUser, navigate, redirectParam]);
+  }, [authLoading, isAuthenticated, mongoUser, navigate, redirectParam]);
 
   const handleQuickFill = (demoEmail) => {
     setEmail(demoEmail);

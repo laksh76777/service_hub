@@ -67,7 +67,7 @@ const BookingDetailPage = () => {
     try {
       setLoading(true);
       const res = await getBookingById(id);
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to load booking.');
     } finally {
@@ -95,7 +95,7 @@ const BookingDetailPage = () => {
     setStartingInspection(true);
     try {
       const res = await startInspection(id);
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Diagnostic inspection started. Record your findings below.');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to start inspection.');
@@ -109,7 +109,7 @@ const BookingDetailPage = () => {
     setSavingInspection(true);
     try {
       const res = await saveInspection(id, inspectionForm);
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Inspection findings recorded successfully.');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to save inspection findings.');
@@ -149,7 +149,7 @@ const BookingDetailPage = () => {
     setStartingWork(true);
     try {
       const res = await startWork(id);
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Service work started! Status updated to WORK_IN_PROGRESS.');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to start service work.');
@@ -184,7 +184,7 @@ const BookingDetailPage = () => {
         additionalNotes: workForm.additionalNotes,
         partsUsed: workParts
       });
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Work execution details and parts saved successfully.');
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to save work details.');
@@ -202,7 +202,7 @@ const BookingDetailPage = () => {
         workPerformed: workForm.workPerformed,
         partsUsed: workParts
       });
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Service completed successfully! Tax invoice and warranty generated.');
       setCompletionModalOpen(false);
     } catch (err) {
@@ -212,14 +212,32 @@ const BookingDetailPage = () => {
     }
   };
 
+  const handleConfirmCompletion = async () => {
+    setActionLoading(true);
+    setActionNotice('');
+    try {
+      const res = await updateBookingStatus(id, {
+        status: 'CUSTOMER_CONFIRMED',
+        reason: 'Customer confirmed that the service work is complete.'
+      });
+      setBooking(res?.booking || res?.data?.booking || res);
+      setActionNotice(res?.message || res?.data?.message || 'Service completion confirmed.');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to confirm service completion.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const currentUserId = (mongoUser?._id || mongoUser?.id)?.toString();
   const isCustomer =
-    booking?.customerId?._id?.toString() === mongoUser?._id?.toString() ||
-    booking?.customerId?.toString() === mongoUser?._id?.toString();
+    booking?.customerId?._id?.toString() === currentUserId ||
+    booking?.customerId?.toString() === currentUserId;
   const isTechnician =
-    booking?.technicianId?._id?.toString() === mongoUser?._id?.toString() ||
-    booking?.providerId?._id?.toString() === mongoUser?._id?.toString() ||
-    booking?.technicianId?.toString() === mongoUser?._id?.toString() ||
-    booking?.providerId?.toString() === mongoUser?._id?.toString();
+    booking?.technicianId?._id?.toString() === currentUserId ||
+    booking?.providerId?._id?.toString() === currentUserId ||
+    booking?.technicianId?.toString() === currentUserId ||
+    booking?.providerId?.toString() === currentUserId;
   const isProvider = isTechnician;
   const isAdmin = mongoUser?.role === 'ADMIN';
 
@@ -248,8 +266,8 @@ const BookingDetailPage = () => {
         status: actionModal.targetStatus,
         reason: reasonInput.trim()
       });
-      setBooking(res.data.booking);
-      setActionNotice(res.data.message || `Status updated to ${actionModal.targetStatus}`);
+      setBooking(res?.booking || res?.data?.booking || res);
+      setActionNotice(res?.message || res?.data?.message || `Status updated to ${actionModal.targetStatus}`);
       setActionModal({ isOpen: false, targetStatus: '', title: '', prompt: '', requireReason: false, reasonPlaceholder: '' });
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Transition rejected by state machine.');
@@ -272,7 +290,7 @@ const BookingDetailPage = () => {
         newTimeSlot,
         reason: rescheduleReason
       });
-      setBooking(res.data.booking);
+      setBooking(res?.booking || res?.data?.booking || res);
       setActionNotice('Booking successfully rescheduled.');
       setIsRescheduleOpen(false);
     } catch (err) {
@@ -662,16 +680,27 @@ const BookingDetailPage = () => {
               </p>
             </div>
             {isCustomer && (
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => {
-                  const revElem = document.getElementById('review-card-section');
-                  if (revElem) revElem.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                Leave Review &darr;
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={actionLoading}
+                  disabled={actionLoading}
+                  onClick={handleConfirmCompletion}
+                >
+                  Confirm Completion
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const revElem = document.getElementById('review-card-section');
+                    if (revElem) revElem.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Leave Review &darr;
+                </Button>
+              </div>
             )}
           </div>
         );

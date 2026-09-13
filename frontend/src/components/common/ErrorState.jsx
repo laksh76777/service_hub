@@ -9,8 +9,8 @@ const ErrorState = ({
   className = ''
 }) => {
   return (
-    <div className={`text-center py-10 px-4 rounded-xl border border-red-200 bg-red-50/40 ${className}`}>
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-600 mb-3">
+    <div className={`text-center py-10 px-6 rounded-2xl border border-rose-200 bg-rose-50/40 ${className}`}>
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 mb-3 shadow-2xs">
         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
             strokeLinecap="round"
@@ -20,8 +20,8 @@ const ErrorState = ({
           />
         </svg>
       </div>
-      <h4 className="text-base font-semibold text-red-900">{title}</h4>
-      <p className="mt-1 text-sm text-red-700 max-w-md mx-auto">{message}</p>
+      <h4 className="text-base font-bold text-rose-900 tracking-tight">{title}</h4>
+      <p className="mt-1 text-xs text-rose-700 max-w-md mx-auto leading-relaxed">{message}</p>
       {onRetry && (
         <div className="mt-4">
           <Button variant="danger" size="sm" onClick={onRetry}>

@@ -771,9 +771,7 @@ const seedMarketplaceData = async () => {
     // 4. DEMO END-TO-END FLOW SAMPLE BOOKING
     // =========================================================================
     const existingDemoBooking = await Booking.findOne({
-      customerId: customerUser._id,
-      providerId: techUser1._id,
-      problemDescription: 'AC is running but not cooling properly.'
+      bookingNumber: 'BK-1042-8821'
     });
 
     if (!existingDemoBooking) {

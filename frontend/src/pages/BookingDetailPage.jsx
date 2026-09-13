@@ -67,6 +67,7 @@ const BookingDetailPage = () => {
     booking?.providerId?._id?.toString() === mongoUser?._id?.toString() ||
     booking?.technicianId?.toString() === mongoUser?._id?.toString() ||
     booking?.providerId?.toString() === mongoUser?._id?.toString();
+  const isProvider = isTechnician;
   const isAdmin = mongoUser?.role === 'ADMIN';
 
   const handleOpenAction = (targetStatus, title, prompt, requireReason = false, reasonPlaceholder = '') => {
@@ -575,15 +576,22 @@ const BookingDetailPage = () => {
         </div>
       )}
 
-      {/* Main Top Header */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Main Top Header: Service, Technician, Current Status */}
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Service Request Order</span>
-          <h1 className="text-2xl font-black text-slate-900 mt-0.5">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">Service Booking</span>
+            <span className={`px-2.5 py-0.5 text-[10px] font-extrabold uppercase rounded-full border ${getStatusColor(booking.status)}`}>
+              {booking.status.replace(/_/g, ' ')}
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             {booking.serviceId?.name || 'Service Appointment'}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Order Reference: <span className="font-mono font-bold text-slate-700">{booking.bookingNumber}</span> | Created on {new Date(booking.createdAt).toLocaleDateString('en-IN')}
+          <p className="text-xs text-slate-600 mt-1 font-medium">
+            Assigned Technician: <span className="font-bold text-slate-900">{booking.technicianId?.name || booking.providerId?.name || 'Verified Pro'}</span>
+            <span className="text-slate-300 mx-2">|</span>
+            Order Reference: <span className="font-mono font-bold text-slate-700">{booking.bookingNumber}</span>
           </p>
         </div>
 

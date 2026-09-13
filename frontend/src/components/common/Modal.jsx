@@ -4,6 +4,7 @@ const Modal = ({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   maxWidth = 'max-w-lg'
@@ -27,30 +28,31 @@ const Modal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4 text-center">
+    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+      <div className="flex min-h-screen items-center justify-center p-4 text-center sm:p-6">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity duration-200"
           onClick={onClose}
           aria-hidden="true"
         />
 
-        {/* Modal dialog */}
+        {/* Modal panel */}
         <div
-          className={`w-full ${maxWidth} transform overflow-hidden rounded-2xl bg-white text-left align-middle shadow-xl transition-all z-10`}
-          role="dialog"
-          aria-modal="true"
+          className={`w-full ${maxWidth} transform overflow-hidden rounded-3xl bg-white text-left align-middle shadow-2xl transition-all duration-200 z-10 border border-slate-200/90 my-8`}
         >
           {title && (
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-4.5">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 tracking-tight">{title}</h3>
+                {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+              </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors -mr-1"
+                aria-label="Close modal"
               >
-                <span className="sr-only">Close</span>
                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
@@ -63,7 +65,7 @@ const Modal = ({
           )}
           <div className="px-6 py-5">{children}</div>
           {footer && (
-            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex justify-end gap-2.5">
+            <div className="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-end gap-2.5">
               {footer}
             </div>
           )}

@@ -8,8 +8,6 @@ import Modal from '../components/common/Modal';
 import { useAuth } from '../context/AuthContext';
 import {
   getMyProviderProfile,
-  adminGetProviders,
-  adminUpdateProviderStatus,
   getBookings,
   updateBookingStatus
 } from '../services/api';
@@ -25,19 +23,7 @@ const ProviderDashboardPage = () => {
   const [bookingNotice, setBookingNotice] = useState('');
   const [rejectModal, setRejectModal] = useState({ isOpen: false, bookingId: '', reason: '' });
 
-  // Admin section state
-  const isAdmin = mongoUser?.role === 'ADMIN';
-  const [adminProviders, setAdminProviders] = useState([]);
-  const [adminFilter, setAdminFilter] = useState('PENDING');
-  const [adminLoading, setAdminLoading] = useState(false);
-  const [actionFeedback, setActionFeedback] = useState('');
-
-  const loadProviderData = async () => {
-    // ADMIN users do not have a ProviderProfile — skip the profile API call
-    if (isAdmin) {
-      setLoading(false);
-      return;
-    }
+  const loadTechnicianData = async () => {
     setLoading(true);
     try {
       const res = await getMyProviderProfile();
@@ -45,7 +31,7 @@ const ProviderDashboardPage = () => {
         setProfile(res.data.profile);
       }
     } catch (err) {
-      console.error('Failed to load provider profile:', err);
+      console.error('Failed to load technician profile:', err);
     } finally {
       setLoading(false);
     }
@@ -59,55 +45,27 @@ const ProviderDashboardPage = () => {
         setBookings(res.data.bookings);
       }
     } catch (err) {
-      console.error('Failed to load provider bookings:', err);
+      console.error('Failed to load technician bookings:', err);
     } finally {
       setBookingsLoading(false);
     }
   };
 
-  const loadAdminProviders = async (status) => {
-    setAdminLoading(true);
-    try {
-      const res = await adminGetProviders({ status });
-      if (res?.data?.providers) {
-        setAdminProviders(res.data.providers);
-      }
-    } catch (err) {
-      console.error('Failed to load admin provider queue:', err);
-    } finally {
-      setAdminLoading(false);
-    }
-  };
-
   useEffect(() => {
     if (mongoUser) {
-      loadProviderData();
+      loadTechnicianData();
       loadBookings();
-      if (isAdmin) {
-        loadAdminProviders('PENDING');
-      }
     }
-  }, [isAdmin, mongoUser]);
+  }, [mongoUser]);
 
   const handleQuickStatusTransition = async (bookingId, targetStatus, reason = '') => {
     try {
       setBookingNotice('');
       const res = await updateBookingStatus(bookingId, { status: targetStatus, reason });
-      setBookingNotice(res.data.message || `Booking updated to ${targetStatus}`);
+      setBookingNotice(res.data.message || `Booking status updated to ${targetStatus}`);
       loadBookings();
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to update booking status.');
-    }
-  };
-
-  const handleAdminStatusUpdate = async (providerId, newStatus) => {
-    setActionFeedback('');
-    try {
-      await adminUpdateProviderStatus(providerId, { status: newStatus });
-      setActionFeedback(`Provider marked as ${newStatus} successfully.`);
-      loadAdminProviders(adminFilter);
-    } catch (err) {
-      setActionFeedback('Failed to update status: ' + err.message);
     }
   };
 
@@ -115,185 +73,137 @@ const ProviderDashboardPage = () => {
     return <Loading fullPage text="Loading technician workspace..." />;
   }
 
-  const status = profile?.status || 'PENDING';
+  const verificationStatus = profile?.status || 'PENDING';
 
-  const statusBannerConfig = {
-    PENDING: {
-      bg: 'bg-amber-50 border-amber-200 text-amber-900',
-      badge: 'bg-amber-100 text-amber-800 border-amber-300',
-      icon: '⏳',
-      title: 'Verification In Progress',
-      message:
-        'Your technician profile is under review by our admin verification team. Complete your profile and trade service offerings so we can approve your account. Unverified technicians do not appear in public customer discovery.'
-    },
-    VERIFIED: {
-      bg: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-      badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-      icon: '✓',
-      title: 'Certified & Verified Technician',
-      message:
-        'Your account is verified! Your technician profile and service offerings are actively listed in customer discovery searches across your configured service areas.'
-    },
-    REJECTED: {
-      bg: 'bg-red-50 border-red-200 text-red-900',
-      badge: 'bg-red-100 text-red-800 border-red-300',
-      icon: '✕',
-      title: 'Verification Needs Attention',
-      message:
-        'Your verification was rejected or requires updated documentation. Please inspect your profile and upload valid trade licensing or identification.'
-    },
-    SUSPENDED: {
-      bg: 'bg-rose-50 border-rose-200 text-rose-900',
-      badge: 'bg-rose-100 text-rose-800 border-rose-300',
-      icon: '⚠',
-      title: 'Account Suspended',
-      message:
-        'Your technician privileges have been temporarily paused. Please contact administrator support to resolve pending compliance or dispute inquiries.'
-    }
-  }[status] || {
-    bg: 'bg-slate-50 border-slate-200 text-slate-900',
-    badge: 'bg-slate-100 text-slate-800 border-slate-300',
-    icon: 'ℹ',
-    title: 'Status: ' + status,
-    message: 'Your technician profile status is currently ' + status
-  };
-
+  // Categorize jobs
   const incomingRequests = bookings.filter((b) => b.status === 'REQUESTED');
+  
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todaysJobs = bookings.filter((b) => {
+    if (!['ACCEPTED', 'SCHEDULED', 'INSPECTION', 'WORK_IN_PROGRESS'].includes(b.status)) return false;
+    const bDate = new Date(b.scheduledDate).toISOString().split('T')[0];
+    return bDate === todayStr;
+  });
+
   const activeJobs = bookings.filter((b) =>
-    ['ACCEPTED', 'SCHEDULED', 'TECHNICIAN_ARRIVED', 'IN_PROGRESS', 'COMPLETION_PENDING'].includes(b.status)
+    ['ACCEPTED', 'SCHEDULED', 'INSPECTION', 'ESTIMATE_PENDING', 'ESTIMATE_SUBMITTED', 'ESTIMATE_APPROVED', 'PAYMENT_PENDING', 'PAYMENT_SUCCESS', 'WORK_IN_PROGRESS'].includes(b.status)
   );
+
   const completedJobs = bookings.filter((b) =>
-    ['CUSTOMER_VERIFIED', 'COMPLETED', 'CANCELLED_BY_CUSTOMER', 'CANCELLED_BY_PROVIDER', 'DISPUTED'].includes(
-      b.status
-    )
+    ['WORK_COMPLETED', 'CUSTOMER_CONFIRMED', 'INVOICED', 'COMPLETED'].includes(b.status)
   );
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Header */}
+      
+      {/* 1. Header & Verification Status */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full border ${
-            isAdmin
-              ? 'text-purple-600 bg-purple-50 border-purple-100'
-              : 'text-blue-600 bg-blue-50 border-blue-100'
-          }`}>
-            {isAdmin ? '👑 Admin Platform Monitor' : 'Technician Portal'}
-          </span>
-          <h1 className="text-3xl font-black text-slate-900 mt-2">
-            {isAdmin
-              ? `Welcome, ${mongoUser?.name || user?.displayName || 'Admin'}`
-              : (mongoUser?.name || profile?.businessName || 'Technician Workspace')}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+              Technician Workspace
+            </span>
+            <span className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${
+              verificationStatus === 'VERIFIED'
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                : 'bg-amber-100 text-amber-800 border-amber-300'
+            }`}>
+              {verificationStatus}
+            </span>
+          </div>
+
+          <h1 className="text-3xl font-black text-slate-900 mt-2 tracking-tight">
+            {profile?.businessName || mongoUser?.name || 'Technician Dashboard'}
           </h1>
           <p className="text-slate-500 text-xs mt-1">
-            {isAdmin
-              ? 'Monitor technician verifications, inspect bookings, handle disputes, and oversee the platform.'
-              : 'Manage your credentials, coverage areas, service offerings, and incoming customer booking requests.'}
+            Review incoming requests, manage active job stages, and deliver verified home repairs.
           </p>
         </div>
 
-        {!isAdmin && (
-          <div className="flex gap-3">
-            <Link to="/technician/profile">
-              <Button variant="outline" size="sm">
-                Edit Profile
-              </Button>
-            </Link>
-            <Link to="/technician/services">
-              <Button variant="primary" size="sm">
-                Manage Services ({profile?.servicesOffered?.length || 0})
-              </Button>
-            </Link>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <Link to="/technician/profile">
+            <Button variant="outline" size="sm">
+              Edit Profile
+            </Button>
+          </Link>
+          <Link to="/technician/services">
+            <Button variant="primary" size="sm">
+              My Services ({profile?.servicesOffered?.length || 0})
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {bookingNotice && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
           <span>✓ {bookingNotice}</span>
-          <button onClick={() => setBookingNotice('')} className="text-emerald-600 hover:text-emerald-900">×</button>
+          <button onClick={() => setBookingNotice('')} className="text-emerald-600 hover:text-emerald-900 cursor-pointer">×</button>
         </div>
       )}
 
-      {/* Verification Status Banner — only shown to TECHNICIAN users */}
-      {!isAdmin && (
-        <div className={`p-6 rounded-2xl border ${statusBannerConfig.bg} shadow-sm`}>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-start gap-3.5">
-              <span className="text-2xl flex-shrink-0">{statusBannerConfig.icon}</span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="font-bold text-base">{statusBannerConfig.title}</h2>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${statusBannerConfig.badge}`}>
-                    {status}
-                  </span>
-                </div>
-                <p className="text-xs mt-1 opacity-90 leading-relaxed max-w-3xl">
-                  {statusBannerConfig.message}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex-shrink-0">
-              {status === 'VERIFIED' ? (
-                <Link to={`/technicians/${profile?._id}`}>
-                  <Button size="sm" variant="outline" className="bg-white/80">
-                    View Public Profile
-                  </Button>
-                </Link>
-              ) : (
-                <Link to="/technician/profile">
-                  <Button size="sm" variant="primary">
-                    Update Credentials
-                  </Button>
-                </Link>
-              )}
+      {/* Verification Notice Banner if Pending */}
+      {verificationStatus === 'PENDING' && (
+        <div className="p-5 rounded-3xl bg-amber-50 border border-amber-200 text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⏳</span>
+            <div>
+              <h3 className="text-sm font-bold">Profile Verification in Progress</h3>
+              <p className="text-xs text-amber-800 mt-0.5 max-w-2xl leading-relaxed">
+                Your profile is under administrative review. Once verified, you will appear in customer searches across your service areas.
+              </p>
             </div>
           </div>
+          <Link to="/technician/profile" className="flex-shrink-0">
+            <Button size="sm" variant="outline" className="border-amber-300 bg-white text-amber-900">
+              Review Profile Details
+            </Button>
+          </Link>
         </div>
       )}
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Incoming Requests</span>
-          <div className="text-xl font-black text-amber-600 mt-1">{incomingRequests.length}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Pending response</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Active Jobs</span>
-          <div className="text-xl font-black text-blue-600 mt-1">{activeJobs.length}</div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">Underway / Scheduled</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Customer Rating</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            ★ {profile?.rating?.average ? profile.rating.average.toFixed(1) : '5.0'}
+      {/* 2. TOP CARDS (Requirement 23: New Requests, Active Jobs, Completed Jobs, Rating) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs">
+          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">New Requests</span>
+          <div className="text-2xl sm:text-3xl font-black text-amber-600 mt-1">
+            {incomingRequests.length}
           </div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {profile?.rating?.count || 0} reviews ({completedJobs.length} completed)
-          </span>
+          <span className="text-[11px] text-slate-500 mt-0.5 block font-medium">Awaiting response</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-xs uppercase font-semibold text-slate-400">Service Coverage</span>
-          <div className="text-xl font-black text-slate-900 mt-1">
-            {profile?.serviceArea?.cities?.length || 0} Cities
+        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs">
+          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Active Jobs</span>
+          <div className="text-2xl sm:text-3xl font-black text-blue-600 mt-1">
+            {activeJobs.length}
           </div>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            {profile?.serviceArea?.pincodes?.length || profile?.serviceArea?.zipCodes?.length || 0} PIN Codes
+          <span className="text-[11px] text-slate-500 mt-0.5 block font-medium">In pipeline</span>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs">
+          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Completed Jobs</span>
+          <div className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">
+            {completedJobs.length}
+          </div>
+          <span className="text-[11px] text-slate-500 mt-0.5 block font-medium">Verified &amp; invoiced</span>
+        </div>
+
+        <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs">
+          <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">Rating</span>
+          <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">
+            ★ {profile?.rating?.average ? Number(profile.rating.average).toFixed(1) : '5.0'}
+          </div>
+          <span className="text-[11px] text-slate-500 mt-0.5 block font-medium">
+            {profile?.rating?.count || 0} reviews
           </span>
         </div>
       </div>
 
-      {/* INCOMING SERVICE REQUESTS QUEUE */}
-      <div id="requests" className="space-y-4">
+      {/* 3. NEW REQUESTS SECTION (Requirement 23 & 24) */}
+      <section id="requests" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900">Incoming Service Requests</h2>
-            <p className="text-xs text-slate-500">New job bookings submitted by customers awaiting your confirmation.</p>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">New Service Requests</h2>
+            <p className="text-xs text-slate-500">Direct booking requests submitted by customers.</p>
           </div>
           <span className="px-3 py-1 bg-amber-100 text-amber-800 text-xs font-bold rounded-full">
             {incomingRequests.length} Pending
@@ -301,37 +211,39 @@ const ProviderDashboardPage = () => {
         </div>
 
         {bookingsLoading ? (
-          <Loading text="Loading incoming bookings..." />
+          <Loading text="Checking new requests..." />
         ) : incomingRequests.length === 0 ? (
-          <div className="p-8 text-center bg-white border border-slate-200 rounded-2xl">
-            <p className="text-sm font-semibold text-slate-700">No new incoming requests</p>
-            <p className="text-xs text-slate-400 mt-1">When customers in your service area request an appointment, they will show up here.</p>
+          <div className="p-8 text-center bg-white border border-slate-200 rounded-3xl">
+            <p className="text-sm font-bold text-slate-800">No pending requests</p>
+            <p className="text-xs text-slate-400 mt-1">New requests from customers will appear here.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {incomingRequests.map((b) => (
               <Card
                 key={b._id}
-                title={<span>{b.serviceId?.name || 'Service Job'}</span>}
-                subtitle={`Ref: ${b.bookingNumber} • Scheduled: ${new Date(b.scheduledDate).toLocaleDateString('en-IN')} (${b.preferredTimeSlot})`}
+                title={b.serviceId?.name || 'Service Request'}
+                subtitle={`Booking Ref: ${b.bookingNumber}`}
                 footer={
                   <div className="flex items-center justify-between w-full pt-1">
                     <Link to={`/bookings/${b._id}`}>
-                      <Button size="sm" variant="outline">
-                        View Details & Timeline &rarr;
+                      <Button size="xs" variant="outline">
+                        Inspect
                       </Button>
                     </Link>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      {/* Reject: secondary/destructive */}
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-red-600 border-red-200 hover:bg-red-50"
+                        className="text-rose-600 border-rose-200 hover:bg-rose-50"
                         onClick={() => {
                           setRejectModal({ isOpen: true, bookingId: b._id, reason: '' });
                         }}
                       >
                         Reject
                       </Button>
+                      {/* Accept: visually primary */}
                       <Button
                         size="sm"
                         variant="primary"
@@ -343,62 +255,123 @@ const ProviderDashboardPage = () => {
                   </div>
                 }
               >
+                {/* Requirement 24: Customer, Service, Problem, Date, Time */}
                 <div className="space-y-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 font-semibold block">Customer:</span>
-                    <span className="font-bold text-slate-800">{b.customerId?.name}</span>
-                    <span className="text-slate-500 block">{b.customerId?.phone} • {b.customerId?.email}</span>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-medium">Customer:</span>
+                    <span className="font-bold text-slate-800">{b.customerId?.name || 'Customer'}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 font-semibold block">Job Location:</span>
-                    <span className="text-slate-700">
-                      {b.address?.addressLine1 || b.address?.streetAddress}
-                      {b.address?.locality ? `, ${b.address.locality}` : ''}
-                      {b.address?.city ? `, ${b.address.city}` : ''} - {b.address?.pincode || b.address?.zipCode}
+
+                  <div className="flex justify-between">
+                    <span className="text-slate-400 font-medium">Schedule:</span>
+                    <span className="font-semibold text-slate-800">
+                      {new Date(b.scheduledDate).toLocaleDateString('en-IN')}
+                      {b.preferredTimeSlot ? ` (${b.preferredTimeSlot})` : ''}
                     </span>
                   </div>
+
                   <div>
-                    <span className="text-slate-400 font-semibold block">Problem Scope:</span>
-                    <p className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700 italic">
+                    <span className="text-slate-400 font-medium block">Problem:</span>
+                    <p className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 italic mt-0.5">
                       "{b.problemDescription}"
                     </p>
+                  </div>
+
+                  {/* Masked location for unaccepted requests */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Location:</span>
+                    <span className="font-medium text-slate-700">
+                      {b.address?.locality || b.address?.city || 'Customer Area'} (Address unlocked upon acceptance)
+                    </span>
                   </div>
                 </div>
               </Card>
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* ACTIVE JOBS & SCHEDULED APPOINTMENTS */}
-      <div id="jobs" className="space-y-4 pt-4 border-t border-slate-200">
+      {/* 4. TODAY'S JOBS SECTION (Requirement 23) */}
+      <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-black text-slate-900">Active Job Pipeline</h2>
-            <p className="text-xs text-slate-500">Confirmed, scheduled, and ongoing jobs governed by the state machine.</p>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">Today's Schedule</h2>
+            <p className="text-xs text-slate-500">Appointments scheduled for today.</p>
+          </div>
+          <span className="text-xs font-bold text-slate-500">
+            {todaysJobs.length} Today
+          </span>
+        </div>
+
+        {todaysJobs.length === 0 ? (
+          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
+            No service jobs scheduled for today.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {todaysJobs.map((j) => (
+              <div
+                key={j._id}
+                className="p-5 rounded-3xl bg-white border border-slate-200 shadow-2xs hover:border-blue-300 transition-colors flex flex-col justify-between"
+              >
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-900 text-sm">{j.serviceId?.name}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">
+                      {j.preferredTimeSlot || 'Today'}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    Customer: <span className="font-semibold text-slate-900">{j.customerId?.name}</span>
+                  </p>
+                  <p className="text-slate-500 text-[11px] line-clamp-1">
+                    📍 {j.address?.addressLine1 || j.address?.streetAddress}, {j.address?.city}
+                  </p>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
+                  <Link to={`/bookings/${j._id}`}>
+                    <Button size="xs" variant="primary">
+                      Manage Job →
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* 5. ACTIVE JOBS SECTION (Requirement 23 & 25) */}
+      <section id="jobs" className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">Active Jobs Pipeline</h2>
+            <p className="text-xs text-slate-500">Ongoing diagnostics, estimates, and repair work.</p>
           </div>
           <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
-            {activeJobs.length} Active
+            {activeJobs.length} In Progress
           </span>
         </div>
 
         {activeJobs.length === 0 ? (
-          <div className="p-6 text-center bg-white border border-slate-200 rounded-2xl text-xs text-slate-400">
-            No active jobs currently in progress.
+          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
+            No active jobs in the pipeline.
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {activeJobs.map((b) => (
               <Card
                 key={b._id}
-                title={<span>{b.serviceId?.name}</span>}
-                subtitle={`Ref: ${b.bookingNumber} • ${new Date(b.scheduledDate).toLocaleDateString('en-IN')}`}
+                title={b.serviceId?.name}
+                subtitle={`Ref: ${b.bookingNumber}`}
                 footer={
                   <div className="flex items-center justify-between w-full pt-1">
-                    <span className="text-[11px] font-bold text-slate-700">₹{b.pricing?.estimatedTotal || 0}</span>
+                    <span className="text-xs font-bold text-slate-800">
+                      ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
+                    </span>
                     <Link to={`/bookings/${b._id}`}>
-                      <Button size="sm" variant="primary">
-                        Manage Job &rarr;
+                      <Button size="xs" variant="primary">
+                        Job Lifecycle &rarr;
                       </Button>
                     </Link>
                   </div>
@@ -406,20 +379,19 @@ const ProviderDashboardPage = () => {
               >
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-semibold">Stage:</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-100 text-blue-800">
+                    <span className="text-slate-400 font-medium">Stage:</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
                       {b.status.replace(/_/g, ' ')}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-semibold block">Customer:</span>
-                    <span className="font-medium text-slate-800">{b.customerId?.name}</span>
+                    <span className="text-slate-400 font-medium block">Customer:</span>
+                    <span className="font-semibold text-slate-800">{b.customerId?.name}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-semibold block">Address:</span>
-                    <span className="text-slate-600">
-                      {b.address?.addressLine1 || b.address?.streetAddress}
-                      {b.address?.locality ? `, ${b.address.locality}` : ''}, {b.address?.city}
+                    <span className="text-slate-400 font-medium block">Full Address:</span>
+                    <span className="text-slate-700">
+                      {b.address?.addressLine1 || b.address?.streetAddress}, {b.address?.locality ? `${b.address.locality}, ` : ''}{b.address?.city}
                     </span>
                   </div>
                 </div>
@@ -427,138 +399,70 @@ const ProviderDashboardPage = () => {
             ))}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* ADMIN VERIFICATION SECTION (Displayed only if logged in user is ADMIN) */}
-      {isAdmin && (
-        <div className="pt-8 border-t border-slate-200 space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200 text-xs font-bold uppercase">
-                Admin Control Room
-              </span>
-              <h2 className="text-2xl font-black text-slate-900 mt-2">Provider Verification Queue</h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Review and approve or reject provider credentials to control marketplace visibility.
-              </p>
-            </div>
-
-            {/* Filter Pills for Admin */}
-            <div className="flex gap-2">
-              {['PENDING', 'VERIFIED', 'REJECTED', 'SUSPENDED'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => {
-                    setAdminFilter(st);
-                    loadAdminProviders(st);
-                  }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                    adminFilter === st
-                      ? 'bg-purple-600 border-purple-600 text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {st}
-                </button>
-              ))}
-            </div>
+      {/* 6. RECENT COMPLETED JOBS (Requirement 23) */}
+      <section className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">Recent Completed Jobs</h2>
+            <p className="text-xs text-slate-500">Finished repairs and finalized tax invoices.</p>
           </div>
-
-          {actionFeedback && (
-            <div className="p-3 bg-purple-50 border border-purple-200 text-purple-900 text-xs font-semibold rounded-xl">
-              {actionFeedback}
-            </div>
-          )}
-
-          {adminLoading ? (
-            <Loading text="Retrieving moderation queue..." />
-          ) : adminProviders.length === 0 ? (
-            <EmptyState
-              title={`No ${adminFilter} providers in queue`}
-              description="There are currently no provider applications matching this verification state."
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {adminProviders.map((ap) => (
-                <Card
-                  key={ap._id}
-                  title={ap.businessName}
-                  subtitle={ap.userId?.email || 'Registered Provider'}
-                  footer={
-                    <div className="flex gap-2 w-full pt-1">
-                      {ap.status !== 'VERIFIED' && (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                          onClick={() => handleAdminStatusUpdate(ap._id, 'VERIFIED')}
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {ap.status !== 'REJECTED' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={() => handleAdminStatusUpdate(ap._id, 'REJECTED')}
-                        >
-                          Reject
-                        </Button>
-                      )}
-                    </div>
-                  }
-                >
-                  <div className="space-y-2 text-xs text-slate-600">
-                    <div>
-                      <span className="text-slate-400 font-semibold block">Applicant:</span>
-                      <span className="font-medium text-slate-800">{ap.userId?.name} ({ap.userId?.phone || 'No phone'})</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-semibold block">License #:</span>
-                      <span className="font-mono text-slate-800">{ap.licenseNumber || 'None declared'}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 font-semibold block">Coverage:</span>
-                      <span>{ap.serviceArea?.cities?.join(', ') || 'No cities set'}</span>
-                    </div>
-                    <div className="pt-1 flex items-center justify-between">
-                      <span className="text-slate-400 font-semibold">Current State:</span>
-                      <span className="px-2 py-0.5 rounded font-black text-[10px] bg-slate-100 text-slate-800">
-                        {ap.status}
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
+          <span className="text-xs font-medium text-slate-500">
+            {completedJobs.length} Completed
+          </span>
         </div>
-      )}
 
-      {/* Rejection Modal requiring mandatory reason */}
+        {completedJobs.length === 0 ? (
+          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
+            No completed jobs to display.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {completedJobs.slice(0, 6).map((c) => (
+              <div
+                key={c._id}
+                className="p-4 rounded-3xl bg-white border border-slate-200 text-xs flex items-center justify-between"
+              >
+                <div>
+                  <h4 className="font-bold text-slate-900">{c.serviceId?.name}</h4>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {c.customerId?.name} • ₹{c.pricing?.finalTotal || c.pricing?.estimatedTotal || 0}
+                  </p>
+                </div>
+                <Link to={`/bookings/${c._id}`}>
+                  <Button size="xs" variant="outline">
+                    View &rarr;
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Rejection Modal with Mandatory Reason (Requirement 24) */}
       <Modal
         isOpen={rejectModal.isOpen}
         onClose={() => setRejectModal({ isOpen: false, bookingId: '', reason: '' })}
-        title="Reject Service Request"
+        title="Decline Service Request"
+        subtitle="Please provide a reason. The customer will be notified."
       >
-        <div className="space-y-4">
-          <p className="text-xs text-slate-600">
-            Please provide a clear reason for declining this request. The customer will be informed.
-          </p>
+        <div className="space-y-4 text-xs">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-              Reason for Rejection <span className="text-red-500">*</span>
+            <label className="block font-bold text-slate-700 mb-1">
+              Reason for Declining <span className="text-red-500">*</span>
             </label>
             <textarea
-              className="w-full border border-slate-300 rounded-xl p-3 text-xs focus:ring-2 focus:ring-red-500 outline-none"
+              className="w-full border border-slate-300 rounded-2xl p-3 text-xs focus:ring-2 focus:ring-rose-500 outline-none"
               rows={3}
-              placeholder="e.g., Unavailable at requested time, outside immediate trade expertise, fully booked..."
+              placeholder="e.g. Schedule fully booked, outside immediate service zone, specialized equipment required..."
               value={rejectModal.reason}
               onChange={(e) => setRejectModal((prev) => ({ ...prev, reason: e.target.value }))}
             />
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+
+          <div className="flex justify-end gap-2.5 pt-2">
             <Button
               variant="outline"
               size="sm"
@@ -567,12 +471,11 @@ const ProviderDashboardPage = () => {
               Cancel
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
               size="sm"
-              className="bg-red-600 hover:bg-red-700 text-white"
               onClick={async () => {
                 if (!rejectModal.reason.trim()) {
-                  alert('A reason is required to reject a booking request.');
+                  alert('A reason is mandatory to decline a request.');
                   return;
                 }
                 const bId = rejectModal.bookingId;
@@ -586,6 +489,7 @@ const ProviderDashboardPage = () => {
           </div>
         </div>
       </Modal>
+
     </div>
   );
 };

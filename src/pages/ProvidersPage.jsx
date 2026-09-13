@@ -4,7 +4,7 @@ import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import EmptyState from '../components/common/EmptyState';
-import Loading from '../components/common/Loading';
+import { SkeletonCard } from '../components/common/Loading';
 import BookingModal from '../components/booking/BookingModal';
 import { getProviders, getServices } from '../services/api';
 
@@ -67,23 +67,26 @@ const ProvidersPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      
       {/* Header */}
-      <div className="mb-8">
+      <div>
         <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
           Verified Directory
         </span>
-        <h1 className="text-3xl font-extrabold text-slate-900 mt-2">Verified Home Service Technicians</h1>
-        <p className="text-slate-600 mt-1 text-sm max-w-2xl">
-          Discover verified trade specialists eligible to perform your service. Review qualifications and request service directly.
+        <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mt-2 tracking-tight">
+          Verified Home Service Technicians
+        </h1>
+        <p className="text-slate-600 mt-1 text-xs sm:text-sm max-w-2xl">
+          Browse certified trade technicians. Inspect qualifications, customer reviews, and request service directly.
         </p>
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-8">
+      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-xs">
         <form onSubmit={handleSearchSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div className="lg:col-span-2">
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Search Technician or Trade</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Search Technician or Trade</label>
             <Input
               placeholder="e.g. Rahul Sharma, AC Repair, Plumbing..."
               value={searchTerm}
@@ -92,14 +95,14 @@ const ProvidersPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Select Service</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Service Trade</label>
             <select
               value={selectedService}
               onChange={(e) => {
                 setSelectedService(e.target.value);
                 loadTechnicians({ service: e.target.value });
               }}
-              className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
             >
               <option value="">All Services</option>
               {services.map((s) => (
@@ -111,14 +114,14 @@ const ProvidersPage = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Minimum Rating</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Rating</label>
             <select
               value={minRating}
               onChange={(e) => {
                 setMinRating(e.target.value);
                 loadTechnicians({ minRating: e.target.value });
               }}
-              className="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-500 bg-white"
             >
               <option value="0">All Ratings</option>
               <option value="4.5">★ 4.5 &amp; above</option>
@@ -127,7 +130,7 @@ const ProvidersPage = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button type="submit" variant="primary" className="flex-1">
+            <Button type="submit" variant="primary" className="flex-1 font-bold">
               Filter
             </Button>
             <Button type="button" variant="outline" onClick={handleResetFilters}>
@@ -137,67 +140,69 @@ const ProvidersPage = () => {
         </form>
       </div>
 
-      {/* Results Header */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-xs font-medium text-slate-500">
-          Showing <span className="font-bold text-slate-800">{technicians.length}</span> verified technicians
-        </p>
-      </div>
-
-      {/* Technicians Grid */}
+      {/* Technicians Grid (Requirement 18) */}
       {loading ? (
-        <Loading fullPage text="Retrieving verified technician directory..." />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
       ) : technicians.length === 0 ? (
         <EmptyState
-          title="No verified technicians found"
-          description="No technicians matched your selected service or filters. Try clearing your filters."
-          actionLabel="Clear Filters"
+          icon="🔍"
+          title="No technicians found"
+          description="No technicians matched your selected criteria. Try adjusting your search query or filters."
+          actionLabel="Clear All Filters"
           onAction={handleResetFilters}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {technicians.map((p) => (
             <Card
-              key={p.id}
+              key={p.id || p._id}
+              className="flex flex-col justify-between"
               title={
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-extrabold text-base text-slate-900 leading-snug">
-                      {p.name || p.businessName}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                        {p.profession || 'Technician'}
-                      </span>
-                      <span className="text-xs font-medium text-slate-500">
-                        • {p.experience || `${p.experienceYears || 1} years exp`}
-                      </span>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div className="h-11 w-11 rounded-2xl bg-blue-50 text-blue-700 font-extrabold flex items-center justify-center text-base flex-shrink-0 shadow-2xs">
+                      {(p.name || p.businessName || 'T')[0]}
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-base text-slate-900 leading-snug">
+                        {p.name || p.businessName}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
+                          {p.profession || 'Technician'}
+                        </span>
+                      </div>
                     </div>
                   </div>
+
                   <div className="text-right flex-shrink-0">
                     <span className="inline-flex items-center gap-1 text-amber-500 font-black text-xs">
                       ★ {p.rating?.average ? Number(p.rating.average).toFixed(1) : '5.0'}
                     </span>
-                    <span className="text-[10px] text-slate-400 block">{p.completedJobsCount || 0} jobs</span>
+                    {p.completedJobsCount > 0 && (
+                      <span className="text-[10px] text-slate-400 block">{p.completedJobsCount} jobs</span>
+                    )}
                   </div>
                 </div>
               }
-              subtitle={
-                <span className="text-xs text-slate-500">
-                  {p.businessName}
-                </span>
-              }
               footer={
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
-                  <Link to={`/technicians/${p.id}`}>
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2 w-full">
+                  {/* Secondary: View Profile */}
+                  <Link to={`/technicians/${p.id || p._id}`}>
                     <Button size="sm" variant="outline">
-                      Profile
+                      View Profile
                     </Button>
                   </Link>
+                  {/* Primary: Request Service */}
                   <Button
                     size="sm"
                     variant="primary"
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                    className="font-bold shadow-2xs"
                     onClick={() => {
                       setTargetTechnician(p);
                       setIsBookingOpen(true);
@@ -209,13 +214,13 @@ const ProvidersPage = () => {
               }
             >
               <div className="space-y-3">
-                {/* Verification Badge */}
+                {/* Verification Badge & Trade Experience */}
                 <div className="flex items-center justify-between text-xs">
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px]">
-                    ✓ {p.verificationStatus || 'Verified'}
+                    ✓ Verified
                   </span>
-                  <span className="text-[11px] text-slate-500 font-medium">
-                    {p.availability?.days ? p.availability.days.slice(0, 3).join(', ') : 'Mon - Sat'}
+                  <span className="text-[11px] text-slate-600 font-semibold">
+                    {p.experience || `${p.experienceYears || 1} yrs experience`}
                   </span>
                 </div>
 
@@ -225,22 +230,24 @@ const ProvidersPage = () => {
                   </p>
                 )}
 
-                {/* Services list */}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {(p.services || []).slice(0, 3).map((srv, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium"
-                    >
-                      {srv}
-                    </span>
-                  ))}
-                  {(p.services || []).length > 3 && (
-                    <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold">
-                      +{p.services.length - 3} more
-                    </span>
-                  )}
-                </div>
+                {/* Real Services List */}
+                {p.services && p.services.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {p.services.slice(0, 3).map((srv, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[11px] font-medium"
+                      >
+                        {srv}
+                      </span>
+                    ))}
+                    {p.services.length > 3 && (
+                      <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[11px] font-semibold">
+                        +{p.services.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </Card>
           ))}

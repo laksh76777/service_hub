@@ -59,7 +59,7 @@ const ReviewCard = ({ booking, isCustomer }) => {
           <span>⭐</span> Verified Service Review
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-          Only customers with verified completed bookings can review service providers.
+          Only customers with verified completed bookings can review technicians.
         </p>
       </div>
 

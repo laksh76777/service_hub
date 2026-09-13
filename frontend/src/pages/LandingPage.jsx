@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/common/Button';
 import { getServices } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const CANONICAL_SERVICES = [
   {
@@ -156,7 +157,18 @@ const TRUSTED_TECHNICIANS = [
 ];
 
 const LandingPage = () => {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [services, setServices] = useState(CANONICAL_SERVICES);
+
+  const handleActionClick = (e, targetPath) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!isAuthenticated) {
+      navigate(`/login?redirect=${encodeURIComponent(targetPath)}&reason=service_request`);
+    } else {
+      navigate(targetPath);
+    }
+  };
 
   useEffect(() => {
     getServices({ limit: 5 })
@@ -211,15 +223,14 @@ const LandingPage = () => {
 
           {/* Exact CTAs */}
           <div className="mt-8 sm:mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link to="/services">
-              <Button
-                variant="primary"
-                size="lg"
-                className="px-8 py-3.5 text-sm sm:text-base font-bold shadow-md shadow-blue-500/20 hover:-translate-y-0.5"
-              >
-                Find a Service
-              </Button>
-            </Link>
+            <Button
+              variant="primary"
+              size="lg"
+              className="px-8 py-3.5 text-sm sm:text-base font-bold shadow-md shadow-blue-500/20 hover:-translate-y-0.5 cursor-pointer"
+              onClick={(e) => handleActionClick(e, '/services')}
+            >
+              Find a Service
+            </Button>
             <Link to="/register?role=TECHNICIAN">
               <Button
                 variant="outline"
@@ -303,10 +314,12 @@ const LandingPage = () => {
           {services.map((srv, idx) => {
             const linkPath = srv._id ? `/services/${srv._id}` : '/services';
             return (
-              <Link
+              <div
                 key={srv.id || srv._id || idx}
-                to={linkPath}
-                className="p-6 rounded-3xl bg-white border border-slate-200 hover:border-blue-400 shadow-2xs hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group"
+                onClick={(e) => handleActionClick(e, linkPath)}
+                role="button"
+                tabIndex={0}
+                className="p-6 rounded-3xl bg-white border border-slate-200 hover:border-blue-400 shadow-2xs hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between group cursor-pointer"
               >
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -328,7 +341,7 @@ const LandingPage = () => {
                   <span>Find Technician</span>
                   <span className="group-hover:translate-x-1 transition-transform duration-150">→</span>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
@@ -440,11 +453,16 @@ const LandingPage = () => {
                 </div>
               </div>
 
-              <Link to="/services" className="mt-5">
-                <Button variant="outline" size="sm" className="w-full text-xs font-bold py-2">
+              <div className="mt-5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs font-bold py-2 cursor-pointer"
+                  onClick={(e) => handleActionClick(e, '/technicians')}
+                >
                   Request Service
                 </Button>
-              </Link>
+              </div>
             </div>
           ))}
         </div>
@@ -464,20 +482,19 @@ const LandingPage = () => {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto flex-shrink-0">
-            <Link to="/services" className="w-full sm:w-auto">
-              <Button
-                variant="secondary"
-                size="lg"
-                className="w-full sm:w-auto text-blue-700 font-bold bg-white hover:bg-blue-50 shadow-sm"
-              >
-                Find a Service
-              </Button>
-            </Link>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="w-full sm:w-auto text-blue-700 font-bold bg-white hover:bg-blue-50 shadow-sm cursor-pointer"
+              onClick={(e) => handleActionClick(e, '/services')}
+            >
+              Find a Service
+            </Button>
             <Link to="/register?role=TECHNICIAN" className="w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="lg"
-                className="w-full sm:w-auto text-white border-white/40 hover:bg-white/10 font-bold"
+                className="w-full sm:w-auto text-white border-white/40 hover:bg-white/10 font-bold cursor-pointer"
               >
                 Join as Technician
               </Button>

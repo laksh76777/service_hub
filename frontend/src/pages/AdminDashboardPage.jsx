@@ -128,8 +128,9 @@ const AdminDashboardPage = () => {
     setOverviewLoading(true);
     try {
       const res = await adminGetOverview();
-      if (res?.data?.data) {
-        setOverview(res.data.data);
+      const ov = res?.data?.data || res?.data || res;
+      if (ov) {
+        setOverview(ov);
       }
     } catch (err) {
       console.error('Failed to load admin overview:', err);
@@ -143,9 +144,8 @@ const AdminDashboardPage = () => {
     setCustomersLoading(true);
     try {
       const res = await adminGetCustomers();
-      if (res?.data?.data?.customers) {
-        setCustomers(res.data.data.customers);
-      }
+      const list = res?.data?.customers || res?.data?.data?.customers || res?.customers || [];
+      setCustomers(list);
     } catch (err) {
       console.error('Failed to load customers:', err);
     } finally {
@@ -158,7 +158,8 @@ const AdminDashboardPage = () => {
     setCustomerModal({ isOpen: true, data: null, loading: true });
     try {
       const res = await adminGetCustomerDetail(id);
-      setCustomerModal({ isOpen: true, data: res?.data?.data, loading: false });
+      const cust = res?.data?.customer || res?.data?.data?.customer || res?.data?.data || res?.data;
+      setCustomerModal({ isOpen: true, data: cust, loading: false });
     } catch (err) {
       alert('Failed to load customer detail: ' + err.message);
       setCustomerModal({ isOpen: false, data: null, loading: false });
@@ -171,7 +172,7 @@ const AdminDashboardPage = () => {
     try {
       const params = status !== 'ALL' ? { status } : {};
       const res = await adminGetTechnicians(params);
-      const list = res?.data?.data?.technicians || [];
+      const list = res?.data?.technicians || res?.data?.data?.technicians || res?.technicians || [];
       setTechnicians(list);
     } catch (err) {
       console.error('Failed to load technicians:', err);
@@ -200,7 +201,8 @@ const AdminDashboardPage = () => {
     setServicesLoading(true);
     try {
       const res = await adminGetServices();
-      setServices(res?.data?.data?.services || []);
+      const list = res?.data?.services || res?.data?.data?.services || res?.services || [];
+      setServices(list);
     } catch (err) {
       console.error('Failed to load services:', err);
     } finally {
@@ -241,7 +243,8 @@ const AdminDashboardPage = () => {
     setBookingsLoading(true);
     try {
       const res = await adminGetBookings();
-      setBookings(res?.data?.data?.bookings || []);
+      const list = res?.data?.bookings || res?.data?.data?.bookings || res?.bookings || [];
+      setBookings(list);
     } catch (err) {
       console.error('Failed to load bookings:', err);
     } finally {
@@ -254,7 +257,8 @@ const AdminDashboardPage = () => {
     setBookingDetailModal({ isOpen: true, data: null, loading: true });
     try {
       const res = await adminGetBookingDetail(id);
-      setBookingDetailModal({ isOpen: true, data: res?.data?.data, loading: false });
+      const bkg = res?.data?.booking || res?.data?.data?.booking || res?.data?.data || res?.data;
+      setBookingDetailModal({ isOpen: true, data: bkg, loading: false });
     } catch (err) {
       alert('Failed to load booking detail: ' + err.message);
       setBookingDetailModal({ isOpen: false, data: null, loading: false });
@@ -266,7 +270,8 @@ const AdminDashboardPage = () => {
     setPaymentsLoading(true);
     try {
       const res = await adminGetPayments();
-      setPayments(res?.data?.data?.payments || []);
+      const list = res?.data?.payments || res?.data?.data?.payments || res?.payments || [];
+      setPayments(list);
     } catch (err) {
       console.error('Failed to load payments:', err);
     } finally {
@@ -279,7 +284,8 @@ const AdminDashboardPage = () => {
     setInvoicesLoading(true);
     try {
       const res = await adminGetInvoices();
-      setInvoices(res?.data?.data?.invoices || []);
+      const list = res?.data?.invoices || res?.data?.data?.invoices || res?.invoices || [];
+      setInvoices(list);
     } catch (err) {
       console.error('Failed to load invoices:', err);
     } finally {
@@ -292,7 +298,8 @@ const AdminDashboardPage = () => {
     setReviewsLoading(true);
     try {
       const res = await adminGetReviews();
-      setReviews(res?.data?.data?.reviews || []);
+      const list = res?.data?.reviews || res?.data?.data?.reviews || res?.reviews || [];
+      setReviews(list);
     } catch (err) {
       console.error('Failed to load reviews:', err);
     } finally {
@@ -305,7 +312,8 @@ const AdminDashboardPage = () => {
     setDisputesLoading(true);
     try {
       const res = await adminGetDisputes();
-      setDisputes(res?.data?.data?.disputes || []);
+      const list = res?.data?.disputes || res?.data?.data?.disputes || res?.disputes || [];
+      setDisputes(list);
     } catch (err) {
       console.error('Failed to load disputes:', err);
     } finally {
@@ -318,7 +326,8 @@ const AdminDashboardPage = () => {
     setReportsLoading(true);
     try {
       const res = await adminGetReports();
-      setReports(res?.data?.data || null);
+      const rep = res?.data?.data || res?.data || null;
+      setReports(rep);
     } catch (err) {
       console.error('Failed to load reports:', err);
     } finally {

@@ -96,7 +96,7 @@ const DemoCheckoutPage = () => {
 
     try {
       // Realistic simulation animation
-      setProcessingStepText('Connecting to Razorpay Payment Gateway...');
+      setProcessingStepText('Connecting to ServiceHub Demo Payment Gateway...');
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       if (activeTab === 'upi') {
@@ -186,20 +186,20 @@ const DemoCheckoutPage = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider text-amber-900 bg-amber-200 px-2 py-0.5 rounded-md">
-                Simulated Gateway
+              <span className="text-xs font-black uppercase tracking-wider text-amber-900 bg-amber-200 px-2.5 py-0.5 rounded-md">
+                DEMO PAYMENT
               </span>
               <span className="text-xs font-bold text-slate-900">
-                Razorpay Checkout Simulator
+                ServiceHub Payment Simulator
               </span>
             </div>
             <p className="text-[11px] text-amber-950/80 mt-0.5 font-medium">
-              This is a test environment. No real money, bank accounts, or cards will be charged.
+              This is a simulated payment environment. No real money will be charged.
             </p>
           </div>
         </div>
         <div className="text-xs font-mono font-bold text-amber-900 bg-white/80 px-3 py-1.5 rounded-lg border border-amber-200 shrink-0">
-          MODE: DEMO_TEST
+          SIMULATED ENVIRONMENT
         </div>
       </div>
 
@@ -240,7 +240,7 @@ const DemoCheckoutPage = () => {
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500 font-medium">Gateway Provider:</span>
-              <span className="font-extrabold text-blue-700">RAZORPAY DEMO</span>
+              <span className="font-extrabold text-blue-700">SERVICEHUB DEMO GATEWAY</span>
             </div>
             <div className="flex justify-between border-t border-slate-200 pt-2">
               <span className="text-slate-500 font-medium">Payment ID / Ref:</span>

@@ -1,24 +1,25 @@
 import React, { useState } from 'react';
 
-// Exact 8-stage lifecycle from requirement 21:
+// Exact 8-stage lifecycle from Phase 7 requirement 5:
+// REQUESTED -> ACCEPTED -> INSPECTION -> ESTIMATE -> APPROVED -> PAYMENT -> WORK IN PROGRESS -> COMPLETED
 const STATUS_LIFECYCLE_STAGES = [
-  { id: 1, key: 'REQUEST_SENT', label: 'Request Sent', statuses: ['REQUESTED'] },
+  { id: 1, key: 'REQUESTED', label: 'Requested', statuses: ['REQUESTED'] },
   { id: 2, key: 'ACCEPTED', label: 'Accepted', statuses: ['ACCEPTED', 'SCHEDULED'] },
   { id: 3, key: 'INSPECTION', label: 'Inspection', statuses: ['INSPECTION', 'ESTIMATE_PENDING'] },
-  { id: 4, key: 'ESTIMATE', label: 'Estimate', statuses: ['ESTIMATE_SUBMITTED', 'ESTIMATE_APPROVED'] },
-  { id: 5, key: 'PAYMENT', label: 'Payment', statuses: ['PAYMENT_PENDING', 'PAYMENT_SUCCESS'] },
-  { id: 6, key: 'WORK_IN_PROGRESS', label: 'Work in Progress', statuses: ['WORK_IN_PROGRESS'] },
-  { id: 7, key: 'COMPLETED', label: 'Completed', statuses: ['WORK_COMPLETED', 'CUSTOMER_CONFIRMED'] },
-  { id: 8, key: 'INVOICE', label: 'Invoice', statuses: ['INVOICED', 'COMPLETED'] }
+  { id: 4, key: 'ESTIMATE', label: 'Estimate', statuses: ['ESTIMATE_SUBMITTED'] },
+  { id: 5, key: 'APPROVED', label: 'Approved', statuses: ['ESTIMATE_APPROVED'] },
+  { id: 6, key: 'PAYMENT', label: 'Payment', statuses: ['PAYMENT_PENDING', 'PAYMENT_SUCCESS'] },
+  { id: 7, key: 'WORK_IN_PROGRESS', label: 'Work In Progress', statuses: ['WORK_IN_PROGRESS'] },
+  { id: 8, key: 'COMPLETED', label: 'Completed', statuses: ['WORK_COMPLETED', 'CUSTOMER_CONFIRMED', 'INVOICED', 'COMPLETED'] }
 ];
 
-const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
+const BookingTimeline = ({ currentStatus, statusHistory = [], jobExecution = {} }) => {
   const [showAuditTrail, setShowAuditTrail] = useState(false);
 
   const isRejected = currentStatus === 'REJECTED';
   const isCancelled = currentStatus === 'CANCELLED' || currentStatus?.includes('CANCELLED');
 
-  // Map backend status to 1-8 stage index
+  // Map backend status to 0-7 stage index
   const getCurrentStageIndex = () => {
     for (let i = 0; i < STATUS_LIFECYCLE_STAGES.length; i++) {
       if (STATUS_LIFECYCLE_STAGES[i].statuses.includes(currentStatus)) {
@@ -26,6 +27,12 @@ const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
       }
     }
     return 0;
+  };
+
+  // Helper to find real occurrence event for a stage
+  const getStageRealEvent = (stg) => {
+    if (!statusHistory || statusHistory.length === 0) return null;
+    return statusHistory.find((ev) => stg.statuses.includes(ev.newStatus));
   };
 
   const currentStageIdx = getCurrentStageIndex();
@@ -69,6 +76,8 @@ const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
               const isCurrent = idx === currentStageIdx;
               const isFuture = idx > currentStageIdx;
 
+              const realEvent = getStageRealEvent(stg);
+
               return (
                 <div key={stg.key} className="flex flex-col items-center text-center max-w-[100px]">
                   {/* Circle Indicator */}
@@ -96,6 +105,13 @@ const BookingTimeline = ({ currentStatus, statusHistory = [] }) => {
                   >
                     {stg.label}
                   </span>
+
+                  {/* Real timestamp if event occurred */}
+                  {realEvent?.timestamp && (
+                    <span className="mt-0.5 text-[9px] text-slate-400 font-medium whitespace-nowrap">
+                      {new Date(realEvent.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
               );
             })}

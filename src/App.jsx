@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 
 // Layouts
 import PublicLayout from './components/layout/PublicLayout';
+import AuthLayout from './components/layout/AuthLayout';
 import CustomerLayout from './components/layout/CustomerLayout';
 import TechnicianLayout from './components/layout/TechnicianLayout';
 import AdminLayout from './components/layout/AdminLayout';
@@ -48,7 +49,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* ================================================================= */}
-          {/* 1. PUBLIC ROUTES (PublicLayout: PublicNavbar + Marketing Footer)  */}
+          {/* 1. PUBLIC ROUTES (PublicLayout: PublicNavbar + Landing Footer)    */}
           {/* ================================================================= */}
           <Route element={<PublicLayout />}>
             <Route index element={<LandingPage />} />
@@ -56,8 +57,6 @@ function App() {
             <Route path="services/:id" element={<ServiceDetailPage />} />
             <Route path="technicians" element={<ProvidersPage />} />
             <Route path="technicians/:id" element={<ProviderDetailPage />} />
-            <Route path="login" element={<LoginPage />} />
-            <Route path="register" element={<RegisterPage />} />
             
             {/* Informational Pages */}
             <Route path="about" element={<AboutPage />} />
@@ -69,6 +68,14 @@ function App() {
             {/* Legacy aliases */}
             <Route path="providers" element={<Navigate to="/technicians" replace />} />
             <Route path="providers/:id" element={<Navigate to="/technicians" replace />} />
+          </Route>
+
+          {/* ================================================================= */}
+          {/* 1B. AUTHENTICATION ROUTES (AuthLayout: Clean Navbar, No Footer)    */}
+          {/* ================================================================= */}
+          <Route element={<AuthLayout />}>
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
           </Route>
 
           {/* ================================================================= */}

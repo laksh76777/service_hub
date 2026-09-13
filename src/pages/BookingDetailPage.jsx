@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getBookingById, updateBookingStatus, rescheduleBooking, startInspection, saveInspection } from '../services/api';
+import {
+  getBookingById,
+  updateBookingStatus,
+  rescheduleBooking,
+  startInspection,
+  saveInspection,
+  startWork,
+  saveWorkExecution,
+  completeWork
+} from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BookingTimeline from '../components/booking/BookingTimeline';
 import JobExecutionCard from '../components/booking/JobExecutionCard';
@@ -106,6 +115,100 @@ const BookingDetailPage = () => {
       alert(err.response?.data?.message || err.message || 'Failed to save inspection findings.');
     } finally {
       setSavingInspection(false);
+    }
+  };
+
+  // Phase 7 Work Execution & Completion States
+  const [workForm, setWorkForm] = useState({
+    workPerformed: '',
+    additionalNotes: ''
+  });
+  const [workParts, setWorkParts] = useState([]);
+  const [newPartName, setNewPartName] = useState('');
+  const [newPartQty, setNewPartQty] = useState(1);
+  const [newPartCost, setNewPartCost] = useState('');
+  const [startingWork, setStartingWork] = useState(false);
+  const [savingWork, setSavingWork] = useState(false);
+  const [completingWork, setCompletingWork] = useState(false);
+  const [completionModalOpen, setCompletionModalOpen] = useState(false);
+  const [completionNotes, setCompletionNotes] = useState('');
+
+  useEffect(() => {
+    if (booking?.jobExecution) {
+      setWorkForm({
+        workPerformed: booking.jobExecution.workPerformed || booking.jobExecution.workNotes || '',
+        additionalNotes: booking.jobExecution.additionalNotes || ''
+      });
+      if (Array.isArray(booking.jobExecution.partsUsed)) {
+        setWorkParts(booking.jobExecution.partsUsed);
+      }
+    }
+  }, [booking]);
+
+  const handleStartWork = async () => {
+    setStartingWork(true);
+    try {
+      const res = await startWork(id);
+      setBooking(res.data.booking);
+      setActionNotice('Service work started! Status updated to WORK_IN_PROGRESS.');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to start service work.');
+    } finally {
+      setStartingWork(false);
+    }
+  };
+
+  const handleAddWorkPart = () => {
+    if (!newPartName.trim()) {
+      alert('Please enter part/material name.');
+      return;
+    }
+    const cost = parseFloat(newPartCost) || 0;
+    const qty = parseInt(newPartQty, 10) || 1;
+    setWorkParts([...workParts, { name: newPartName.trim(), quantity: qty, cost }]);
+    setNewPartName('');
+    setNewPartQty(1);
+    setNewPartCost('');
+  };
+
+  const handleRemoveWorkPart = (idx) => {
+    setWorkParts(workParts.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveWorkExecution = async (e) => {
+    e?.preventDefault();
+    setSavingWork(true);
+    try {
+      const res = await saveWorkExecution(id, {
+        workPerformed: workForm.workPerformed,
+        additionalNotes: workForm.additionalNotes,
+        partsUsed: workParts
+      });
+      setBooking(res.data.booking);
+      setActionNotice('Work execution details and parts saved successfully.');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to save work details.');
+    } finally {
+      setSavingWork(false);
+    }
+  };
+
+  const handleCompleteWork = async (e) => {
+    e?.preventDefault();
+    setCompletingWork(true);
+    try {
+      const res = await completeWork(id, {
+        completionNotes: completionNotes.trim(),
+        workPerformed: workForm.workPerformed,
+        partsUsed: workParts
+      });
+      setBooking(res.data.booking);
+      setActionNotice('Service completed successfully! Tax invoice and warranty generated.');
+      setCompletionModalOpen(false);
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to mark service completed.');
+    } finally {
+      setCompletingWork(false);
     }
   };
 
@@ -483,7 +586,9 @@ const BookingDetailPage = () => {
                 <span className="text-emerald-600 font-bold text-base">✓</span> Payment Successful
               </div>
               <p className="text-xs text-emerald-800 mt-0.5">
-                Payment verified in DEMO mode. Service authorized. Amount: <span className="font-bold text-slate-900">₹{amount}</span>.
+                {isCustomer
+                  ? `Payment authorized in Demo Mode (₹${amount}). Waiting for technician to commence service work.`
+                  : `Customer payment verified (₹${amount}). Service is authorized. Click below to commence work.`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -494,9 +599,11 @@ const BookingDetailPage = () => {
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={() => handleOpenAction('WORK_IN_PROGRESS', 'Start Work', 'Commence work on this service order?')}
+                  loading={startingWork}
+                  disabled={startingWork}
+                  onClick={handleStartWork}
                 >
-                  Start Work (In Progress)
+                  {startingWork ? 'Starting...' : 'Start Work'}
                 </Button>
               )}
             </div>
@@ -507,52 +614,64 @@ const BookingDetailPage = () => {
         return (
           <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-indigo-900">
-                ⚡ Work in Progress
+              <div className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                <span>⚡</span> Work In Progress
               </div>
               <p className="text-xs text-indigo-700 mt-0.5">
                 {isCustomer
-                  ? 'Technician is actively working on your repair.'
-                  : 'Perform service work. Click below once complete.'}
+                  ? 'Technician is actively performing the approved repair work at your location.'
+                  : 'Service execution is underway. Record work notes and materials used below, then mark completed.'}
               </p>
             </div>
             {(isTechnician || isAdmin) && (
-              <Button
-                size="sm"
-                variant="primary"
-                className="bg-purple-600 hover:bg-purple-700"
-                onClick={() => handleOpenAction('WORK_COMPLETED', 'Submit Work Completed', 'Have you finished all work scope?')}
-              >
-                Mark Work Completed
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const execElem = document.getElementById('work-execution-section');
+                    if (execElem) execElem.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                >
+                  Edit Work Details &darr;
+                </Button>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="bg-purple-600 hover:bg-purple-700 font-bold"
+                  onClick={() => setCompletionModalOpen(true)}
+                >
+                  Mark Work Completed
+                </Button>
+              </div>
             )}
           </div>
         );
 
       case 'WORK_COMPLETED':
         return (
-          <div className="p-5 rounded-2xl bg-purple-50 border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+          <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-purple-900">
-                🏁 Work Completed
+              <div className="text-sm font-bold text-emerald-950 flex items-center gap-2">
+                <span>🏁</span> Work Completed
               </div>
-              <p className="text-xs text-purple-700 mt-0.5">
+              <p className="text-xs text-emerald-800 mt-0.5">
                 {isCustomer
-                  ? 'Technician completed the repair. Please inspect and confirm.'
-                  : 'Work submitted. Awaiting customer confirmation.'}
+                  ? 'Technician completed the service. Your final invoice and 30-day warranty coverage are active below. Please leave a verified review!'
+                  : 'Service marked as completed. Tax invoice and 30-day warranty coverage have been generated.'}
               </p>
             </div>
             {isCustomer && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="primary"
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={() => handleOpenAction('CUSTOMER_CONFIRMED', 'Confirm Completion', 'Confirm that service was completed to your satisfaction?')}
-                >
-                  Confirm Completion
-                </Button>
-              </div>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const revElem = document.getElementById('review-card-section');
+                  if (revElem) revElem.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Leave Review &darr;
+              </Button>
             )}
           </div>
         );
@@ -670,7 +789,7 @@ const BookingDetailPage = () => {
 
       {/* Interactive Timeline */}
       <div className="mb-6">
-        <BookingTimeline currentStatus={booking.status} statusHistory={booking.statusHistory || []} />
+        <BookingTimeline currentStatus={booking.status} statusHistory={booking.statusHistory || []} jobExecution={booking.jobExecution || {}} />
       </div>
 
       {/* Phase 6: Job Execution & Customer/Technician OTP Verification */}
@@ -930,6 +1049,237 @@ const BookingDetailPage = () => {
             canDelete={isTechnician || isAdmin}
           />
 
+          {/* Phase 7: Service Execution & Work Performed */}
+          <div id="work-execution-section">
+            <Card title="Service Execution & Work Performed">
+              <div className="space-y-4 text-xs">
+                {/* Status overview badges */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Work Started</span>
+                    <span className="font-semibold text-slate-800">
+                      {booking.jobExecution?.workStartedAt
+                        ? new Date(booking.jobExecution.workStartedAt).toLocaleString('en-IN')
+                        : 'Not yet started'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Work Completed</span>
+                    <span className="font-semibold text-slate-800">
+                      {booking.jobExecution?.completedAt || booking.completedAt
+                        ? new Date(booking.jobExecution?.completedAt || booking.completedAt).toLocaleString('en-IN')
+                        : 'In progress / Pending'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Execution Status</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                      ['WORK_COMPLETED', 'CUSTOMER_CONFIRMED', 'INVOICED', 'COMPLETED'].includes(booking.status)
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : booking.status === 'WORK_IN_PROGRESS'
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {booking.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Amount Authorized</span>
+                    <span className="font-bold text-slate-900 text-sm">
+                      ₹{booking.pricing?.finalTotal || booking.pricing?.estimatedTotal || 0}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Technician Form (Active when WORK_IN_PROGRESS and caller is assigned technician) */}
+                {isTechnician && booking.status === 'WORK_IN_PROGRESS' && (
+                  <div className="p-4 bg-indigo-50/50 border border-indigo-200 rounded-2xl space-y-4">
+                    <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
+                      <span className="text-xs font-bold text-indigo-950 uppercase tracking-wider">
+                        ⚡ Technician Work Execution Form
+                      </span>
+                      <Button
+                        size="xs"
+                        variant="primary"
+                        className="bg-purple-600 hover:bg-purple-700 font-bold"
+                        onClick={() => setCompletionModalOpen(true)}
+                      >
+                        Mark Work Completed &rarr;
+                      </Button>
+                    </div>
+
+                    <form onSubmit={handleSaveWorkExecution} className="space-y-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Work Performed / Service Actions *
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={workForm.workPerformed}
+                          onChange={(e) => setWorkForm({ ...workForm, workPerformed: e.target.value })}
+                          placeholder="Detail all repairs, maintenance procedures, adjustments, or cleanings performed..."
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Additional Work Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={workForm.additionalNotes}
+                          onChange={(e) => setWorkForm({ ...workForm, additionalNotes: e.target.value })}
+                          placeholder="e.g. Tested electrical draw, verified operating pressure at 65 PSI"
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+
+                      {/* Parts/Materials Used Entry */}
+                      <div className="pt-2 border-t border-indigo-200">
+                        <label className="block font-semibold text-slate-700 mb-2">
+                          Parts &amp; Materials Used
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 bg-white rounded-xl border border-indigo-200">
+                          <input
+                            type="text"
+                            placeholder="Part / Material Name"
+                            value={newPartName}
+                            onChange={(e) => setNewPartName(e.target.value)}
+                            className="sm:col-span-6 px-3 py-1.5 text-xs rounded-lg border border-slate-300"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Qty"
+                            value={newPartQty}
+                            onChange={(e) => setNewPartQty(e.target.value)}
+                            className="sm:col-span-2 px-2 py-1.5 text-xs rounded-lg border border-slate-300 text-center"
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Cost (₹)"
+                            value={newPartCost}
+                            onChange={(e) => setNewPartCost(e.target.value)}
+                            className="sm:col-span-2 px-2 py-1.5 text-xs rounded-lg border border-slate-300 text-right"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddWorkPart}
+                            className="sm:col-span-2 text-xs py-1"
+                          >
+                            + Add Part
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="primary"
+                          loading={savingWork}
+                          disabled={savingWork}
+                        >
+                          {savingWork ? 'Saving...' : 'Save Work Execution Details'}
+                        </Button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                {/* Display recorded Work Performed (Customer & Technician & Admin) */}
+                <div className="space-y-3">
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                    <span className="text-slate-400 font-bold uppercase block text-[10px] mb-1 tracking-wider">
+                      Work Performed
+                    </span>
+                    <p className="text-xs text-slate-800 whitespace-pre-wrap font-medium">
+                      {booking.jobExecution?.workPerformed || booking.jobExecution?.workNotes || (
+                        <span className="text-slate-400 italic">Work execution details will appear once logged by technician.</span>
+                      )}
+                    </p>
+                  </div>
+
+                  {/* Additional Work Notes */}
+                  {booking.jobExecution?.additionalNotes && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
+                      <span className="text-slate-400 font-bold uppercase block text-[10px] mb-1">Additional Notes</span>
+                      <p className="text-slate-700 italic">{booking.jobExecution.additionalNotes}</p>
+                    </div>
+                  )}
+
+                  {/* Completion Notes */}
+                  {(booking.jobExecution?.completionNotes || booking.completionNotes) && (
+                    <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl text-xs">
+                      <span className="text-purple-800 font-bold uppercase block text-[10px] mb-1 tracking-wider">
+                        Completion Sign-Off Notes
+                      </span>
+                      <p className="text-purple-950 font-medium whitespace-pre-wrap">
+                        {booking.jobExecution?.completionNotes || booking.completionNotes}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Parts Used Table */}
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase block text-[10px] mb-2">
+                      Parts &amp; Materials Installed
+                    </span>
+                    {((booking.jobExecution?.partsUsed && booking.jobExecution.partsUsed.length > 0) || workParts.length > 0) ? (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                            <tr>
+                              <th className="py-2.5 px-3">Part / Material</th>
+                              <th className="py-2.5 px-3 text-center">Quantity</th>
+                              <th className="py-2.5 px-3 text-right">Unit Cost</th>
+                              <th className="py-2.5 px-3 text-right">Total</th>
+                              {isTechnician && booking.status === 'WORK_IN_PROGRESS' && (
+                                <th className="py-2.5 px-3 text-center">Action</th>
+                              )}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-slate-800">
+                            {(workParts.length > 0 ? workParts : (booking.jobExecution?.partsUsed || [])).map((p, idx) => (
+                              <tr key={idx}>
+                                <td className="py-2 px-3 font-semibold">{p.name}</td>
+                                <td className="py-2 px-3 text-center">{p.quantity}</td>
+                                <td className="py-2 px-3 text-right">₹{p.cost}</td>
+                                <td className="py-2 px-3 text-right font-bold text-slate-900">
+                                  ₹{p.cost * p.quantity}
+                                </td>
+                                {isTechnician && booking.status === 'WORK_IN_PROGRESS' && (
+                                  <td className="py-2 px-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveWorkPart(idx)}
+                                      className="text-red-500 hover:text-red-700 font-bold cursor-pointer"
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        No additional parts or replacement materials recorded for this service.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </div>
+
           {/* Phase 7: Final Tax Invoice & PDF Download */}
           <InvoiceCard
             booking={booking}
@@ -954,10 +1304,12 @@ const BookingDetailPage = () => {
           />
 
           {/* Phase 9: Verified Service Review */}
-          <ReviewCard
-            booking={booking}
-            isCustomer={isCustomer}
-          />
+          <div id="review-card-section">
+            <ReviewCard
+              booking={booking}
+              isCustomer={isCustomer}
+            />
+          </div>
 
           {/* Phase 9: Dispute Resolution & Mediation */}
           <DisputeCard
@@ -1093,6 +1445,50 @@ const BookingDetailPage = () => {
               />
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Phase 7 Technician Work Completion Modal */}
+      <Modal
+        isOpen={completionModalOpen}
+        onClose={() => setCompletionModalOpen(false)}
+        title="Mark Service Work Completed"
+        footer={
+          <div className="flex items-center justify-between w-full">
+            <Button variant="outline" onClick={() => setCompletionModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={handleCompleteWork}
+              disabled={completingWork}
+            >
+              {completingWork ? 'Finalizing...' : 'Confirm Completion'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 text-purple-900">
+            <p className="font-bold mb-1">Finalizing Service Execution</p>
+            <p className="text-[11px] text-purple-700">
+              Completing this service will transition the booking status to <span className="font-mono font-bold">WORK_COMPLETED</span>, generate the authoritative tax invoice, and activate the 30-day warranty coverage.
+            </p>
+          </div>
+
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Completion Notes / Customer Handover Summary
+            </label>
+            <textarea
+              rows={3}
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              placeholder="e.g. Service successfully performed. Replaced capacitor, cleaned indoor filters, tested cooling performance with customer present."
+              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
         </div>
       </Modal>
 

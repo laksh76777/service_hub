@@ -47,24 +47,34 @@ const CustomerNavbar = () => {
             </Link>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-1.5 ml-6">
+            <nav className="hidden md:flex items-center gap-1 ml-4">
               <NavLink to="/customer/dashboard" end className={navLinkClasses}>
                 Dashboard
               </NavLink>
-              <NavLink to="/customer/services" className={navLinkClasses}>
-                Services
-              </NavLink>
-              <NavLink to="/customer/technicians" className={navLinkClasses}>
-                Find Technicians
-              </NavLink>
               <NavLink to="/customer/bookings" className={navLinkClasses}>
                 My Bookings
+              </NavLink>
+              <NavLink to="/customer/invoices" className={navLinkClasses}>
+                Invoices
+              </NavLink>
+              <NavLink to="/customer/warranty" className={navLinkClasses}>
+                Warranty
+              </NavLink>
+              <NavLink to="/customer/services" className={navLinkClasses}>
+                Services
               </NavLink>
             </nav>
           </div>
 
           {/* Right Action Area */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-3">
+            <Link
+              to="/customer/services"
+              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 shadow-2xs transition"
+            >
+              + Book Service
+            </Link>
+
             <NotificationBell />
 
             <div className="h-5 w-px bg-slate-200" />

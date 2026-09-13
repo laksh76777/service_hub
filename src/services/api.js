@@ -82,6 +82,9 @@ export const verifyBookingOtp = (id, data) => api.post(`/bookings/${id}/verify-o
 export const updateJobExecution = (id, data) => api.patch(`/bookings/${id}/job-execution`, data);
 export const startInspection = (id) => api.patch(`/technician/jobs/${id}/start-inspection`);
 export const saveInspection = (id, data) => api.patch(`/technician/jobs/${id}/inspection`, data);
+export const startWork = (id) => api.patch(`/technician/jobs/${id}/start-work`);
+export const saveWorkExecution = (id, data) => api.patch(`/technician/jobs/${id}/work-execution`, data);
+export const completeWork = (id, data = {}) => api.patch(`/technician/jobs/${id}/complete-work`, data);
 
 // Saved Addresses APIs
 export const getMyAddresses = () => api.get('/addresses');
@@ -174,7 +177,11 @@ export const adminGetBookingDetail = (id) => api.get(`/admin/bookings/${id}`);
 export const adminGetPayments = () => api.get('/admin/payments');
 export const adminGetInvoices = () => api.get('/admin/invoices');
 export const adminGetReviews = () => api.get('/admin/reviews');
-export const adminGetDisputes = () => api.get('/admin/disputes');
+export const adminGetDisputes = (params = {}) => api.get('/admin/disputes', { params });
+export const adminUpdateDisputeStatus = (id, data) => api.patch(`/admin/disputes/${id}/status`, data);
+export const adminGetWarranties = (params = {}) => api.get('/admin/warranties', { params });
+export const adminGetWarrantyClaims = (params = {}) => api.get('/admin/warranties/claims', { params });
+export const adminUpdateWarrantyClaimStatus = (claimId, data) => api.patch(`/admin/warranties/claims/${claimId}/status`, data);
 export const adminGetReports = () => api.get('/admin/reports');
 export const adminGetProfile = () => api.get('/admin/profile');
 

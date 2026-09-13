@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const PublicNavbar = () => {
-  const { isAuthenticated, role, user, logout } = useAuth();
+  const { isAuthenticated, role, user, mongoUser, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const getDashboardPath = () => {
     if (role === 'ADMIN') return '/admin/dashboard';
-    if (role === 'TECHNICIAN') return '/technician/dashboard';
+    if (role === 'TECHNICIAN' || role === 'PROVIDER') return '/technician/dashboard';
     return '/customer/dashboard';
   };
 
   const getDashboardLabel = () => {
     if (role === 'ADMIN') return 'Admin Console';
-    if (role === 'TECHNICIAN') return 'Technician Portal';
-    return 'My Dashboard';
+    if (role === 'TECHNICIAN' || role === 'PROVIDER') return 'Technician Portal';
+    return 'Customer Portal';
   };
 
   const handleLogout = async () => {
@@ -27,6 +28,19 @@ const PublicNavbar = () => {
       console.error('Logout error:', err);
     }
   };
+
+  const handleHashNav = (e, hashId) => {
+    if (location.pathname === '/') {
+      e.preventDefault();
+      const el = document.getElementById(hashId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+    setMobileMenuOpen(false);
+  };
+
+  const displayName = mongoUser?.name || user?.displayName || user?.email?.split('@')[0] || 'Account';
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -52,15 +66,26 @@ const PublicNavbar = () => {
             <Link to="/" className="hover:text-blue-600 transition">
               Home
             </Link>
+            <a
+              href="/#how-it-works"
+              onClick={(e) => handleHashNav(e, 'how-it-works')}
+              className="hover:text-blue-600 transition cursor-pointer"
+            >
+              How It Works
+            </a>
             <Link to="/services" className="hover:text-blue-600 transition">
               Services
             </Link>
+            <a
+              href="/#why-servicehub"
+              onClick={(e) => handleHashNav(e, 'why-servicehub')}
+              className="hover:text-blue-600 transition cursor-pointer"
+            >
+              Why ServiceHub
+            </a>
             <Link to="/technicians" className="hover:text-blue-600 transition">
               Find Technicians
             </Link>
-            <a href="/#how-it-works" className="hover:text-blue-600 transition">
-              How It Works
-            </a>
           </nav>
 
           {/* Right CTA Actions */}
@@ -69,13 +94,16 @@ const PublicNavbar = () => {
               <div className="flex items-center gap-3">
                 <Link
                   to={getDashboardPath()}
-                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
                 >
-                  {getDashboardLabel()}
+                  <span>{getDashboardLabel()}</span>
+                  <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded font-mono">
+                    {role}
+                  </span>
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-red-600 transition"
+                  className="px-3 py-2 text-sm font-medium text-slate-600 hover:text-red-600 transition cursor-pointer"
                 >
                   Logout
                 </button>
@@ -92,7 +120,7 @@ const PublicNavbar = () => {
                   to="/register"
                   className="px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition"
                 >
-                  Register
+                  Get Started
                 </Link>
               </div>
             )}
@@ -102,7 +130,7 @@ const PublicNavbar = () => {
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100"
+              className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 cursor-pointer"
               aria-label="Toggle menu"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -127,6 +155,13 @@ const PublicNavbar = () => {
           >
             Home
           </Link>
+          <a
+            href="/#how-it-works"
+            onClick={(e) => handleHashNav(e, 'how-it-works')}
+            className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            How It Works
+          </a>
           <Link
             to="/services"
             onClick={() => setMobileMenuOpen(false)}
@@ -134,6 +169,13 @@ const PublicNavbar = () => {
           >
             Services
           </Link>
+          <a
+            href="/#why-servicehub"
+            onClick={(e) => handleHashNav(e, 'why-servicehub')}
+            className="block px-3 py-2 rounded-md text-base font-medium text-slate-700 hover:bg-slate-100 cursor-pointer"
+          >
+            Why ServiceHub
+          </a>
           <Link
             to="/technicians"
             onClick={() => setMobileMenuOpen(false)}
@@ -144,6 +186,9 @@ const PublicNavbar = () => {
           <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
             {isAuthenticated ? (
               <>
+                <div className="text-xs text-slate-500 px-3 font-medium">
+                  Signed in as <span className="font-semibold text-slate-800">{displayName}</span> ({role})
+                </div>
                 <Link
                   to={getDashboardPath()}
                   onClick={() => setMobileMenuOpen(false)}
@@ -156,7 +201,7 @@ const PublicNavbar = () => {
                     setMobileMenuOpen(false);
                     handleLogout();
                   }}
-                  className="w-full text-center px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
+                  className="w-full text-center px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg cursor-pointer"
                 >
                   Logout
                 </button>
@@ -175,7 +220,7 @@ const PublicNavbar = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full text-center px-4 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 text-white"
                 >
-                  Register
+                  Get Started
                 </Link>
               </>
             )}

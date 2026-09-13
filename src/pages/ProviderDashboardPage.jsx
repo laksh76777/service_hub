@@ -9,7 +9,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   getMyProviderProfile,
   getBookings,
-  updateBookingStatus
+  updateBookingStatus,
+  startWork
 } from '../services/api';
 
 const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
@@ -17,6 +18,7 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [jobStageFilter, setJobStageFilter] = useState('ALL');
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -71,6 +73,17 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
       loadBookings();
     } catch (err) {
       alert(err.response?.data?.message || err.message || 'Failed to update booking status.');
+    }
+  };
+
+  const handleStartWorkQuick = async (bookingId) => {
+    try {
+      setBookingNotice('');
+      await startWork(bookingId);
+      setBookingNotice('Service work started! Booking is now WORK_IN_PROGRESS.');
+      loadBookings();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to start service work.');
     }
   };
 
@@ -397,62 +410,141 @@ const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
       {/* 5. ACTIVE JOBS SECTION (Requirement 23 & 25) */}
       {(activeTab === 'overview' || activeTab === 'jobs') && (
       <section id="jobs" className="space-y-4 pt-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-900 tracking-tight">Active Jobs Pipeline</h2>
-            <p className="text-xs text-slate-500">Ongoing diagnostics, estimates, and repair work.</p>
+            <p className="text-xs text-slate-500">Ongoing diagnostics, estimates, and repair execution stages.</p>
           </div>
-          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
-            {activeJobs.length} In Progress
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full w-fit">
+            {activeJobs.length} In Pipeline
           </span>
         </div>
 
-        {activeJobs.length === 0 ? (
-          <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
-            No active jobs in the pipeline.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {activeJobs.map((b) => (
-              <Card
-                key={b._id}
-                title={b.serviceId?.name}
-                subtitle={`Ref: ${b.bookingNumber}`}
-                footer={
-                  <div className="flex items-center justify-between w-full pt-1">
-                    <span className="text-xs font-bold text-slate-800">
-                      ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
-                    </span>
-                    <Link to={`/technician/jobs/${b._id}`}>
-                      <Button size="xs" variant="primary">
-                        Job Lifecycle &rarr;
-                      </Button>
-                    </Link>
+        {/* Phase 7 Job Stage Filters */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {[
+            { id: 'ALL', label: `All Active (${activeJobs.length})` },
+            { id: 'ACCEPTED', label: 'Accepted' },
+            { id: 'INSPECTION', label: 'Inspection' },
+            { id: 'ESTIMATE', label: 'Estimate' },
+            { id: 'PAYMENT_PENDING', label: 'Payment Pending' },
+            { id: 'READY_TO_START', label: 'Ready to Start' },
+            { id: 'WORK_IN_PROGRESS', label: 'Work In Progress' },
+            { id: 'COMPLETED', label: 'Completed' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setJobStageFilter(tab.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                jobStageFilter === tab.id
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {(() => {
+          const filteredJobs = (jobStageFilter === 'COMPLETED' ? completedJobs : bookings).filter((b) => {
+            if (jobStageFilter === 'ALL') {
+              return ['ACCEPTED', 'SCHEDULED', 'INSPECTION', 'ESTIMATE_PENDING', 'ESTIMATE_SUBMITTED', 'ESTIMATE_APPROVED', 'PAYMENT_PENDING', 'PAYMENT_SUCCESS', 'WORK_IN_PROGRESS'].includes(b.status);
+            }
+            if (jobStageFilter === 'ACCEPTED') return ['ACCEPTED', 'SCHEDULED'].includes(b.status);
+            if (jobStageFilter === 'INSPECTION') return ['INSPECTION', 'DIAGNOSIS'].includes(b.status);
+            if (jobStageFilter === 'ESTIMATE') return ['ESTIMATE_PENDING', 'ESTIMATE_SUBMITTED', 'ESTIMATE_APPROVED'].includes(b.status);
+            if (jobStageFilter === 'PAYMENT_PENDING') return ['PAYMENT_PENDING', 'CUSTOMER_CONFIRMED', 'CUSTOMER_VERIFIED', 'COMPLETION_PENDING'].includes(b.status);
+            if (jobStageFilter === 'READY_TO_START') return b.status === 'PAYMENT_SUCCESS';
+            if (jobStageFilter === 'WORK_IN_PROGRESS') return b.status === 'WORK_IN_PROGRESS';
+            if (jobStageFilter === 'COMPLETED') return ['WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(b.status);
+            return true;
+          });
+
+          if (filteredJobs.length === 0) {
+            return (
+              <div className="p-6 text-center bg-white border border-slate-200 rounded-3xl text-xs text-slate-400">
+                No jobs currently found in the '{jobStageFilter.replace(/_/g, ' ')}' stage.
+              </div>
+            );
+          }
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {filteredJobs.map((b) => (
+                <Card
+                  key={b._id}
+                  title={b.serviceId?.name}
+                  subtitle={`Ref: ${b.bookingNumber}`}
+                  footer={
+                    <div className="flex items-center justify-between w-full pt-2 border-t border-slate-100">
+                      <span className="text-xs font-bold text-slate-800">
+                        ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {b.status === 'PAYMENT_SUCCESS' ? (
+                          <Button
+                            size="xs"
+                            variant="primary"
+                            className="bg-indigo-600 hover:bg-indigo-700 font-bold text-xs"
+                            onClick={() => handleStartWorkQuick(b._id)}
+                          >
+                            ⚡ Start Work
+                          </Button>
+                        ) : b.status === 'WORK_IN_PROGRESS' ? (
+                          <Link to={`/technician/jobs/${b._id}#work-execution-section`}>
+                            <Button size="xs" variant="primary" className="bg-purple-600 hover:bg-purple-700 text-xs">
+                              Manage Work →
+                            </Button>
+                          </Link>
+                        ) : ['WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(b.status) ? (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="outline" className="text-xs">
+                              Invoice / Details →
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link to={`/technician/jobs/${b._id}`}>
+                            <Button size="xs" variant="primary" className="text-xs">
+                              Job Lifecycle →
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  }
+                >
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 font-medium">Stage:</span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase border ${
+                        b.status === 'PAYMENT_SUCCESS'
+                          ? 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                          : b.status === 'WORK_IN_PROGRESS'
+                          ? 'bg-purple-50 text-purple-800 border-purple-200'
+                          : ['WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(b.status)
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : 'bg-blue-50 text-blue-800 border-blue-200'
+                      }`}>
+                        {b.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium block">Customer:</span>
+                      <span className="font-semibold text-slate-800">{b.customerId?.name}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-medium block">Full Address:</span>
+                      <span className="text-slate-700 line-clamp-1">
+                        {b.address?.addressLine1 || b.address?.streetAddress}, {b.address?.locality ? `${b.address.locality}, ` : ''}{b.address?.city}
+                      </span>
+                    </div>
                   </div>
-                }
-              >
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-400 font-medium">Stage:</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-blue-50 text-blue-800 border border-blue-200">
-                      {b.status.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 font-medium block">Customer:</span>
-                    <span className="font-semibold text-slate-800">{b.customerId?.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 font-medium block">Full Address:</span>
-                    <span className="text-slate-700">
-                      {b.address?.addressLine1 || b.address?.streetAddress}, {b.address?.locality ? `${b.address.locality}, ` : ''}{b.address?.city}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
+                </Card>
+              ))}
+            </div>
+          );
+        })()}
       </section>
       )}
 

@@ -116,30 +116,47 @@ const WarrantyCard = ({ booking, isCustomer, isProvider, isAdmin }) => {
         </div>
 
         {/* Action button in header */}
-        {!warranty && (isProvider || isCustomer || isAdmin) && ['CUSTOMER_VERIFIED', 'CUSTOMER_CONFIRMED', 'WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(booking?.status) && (
-          <Button
-            size="sm"
-            variant="primary"
-            onClick={() => setAssignModalOpen(true)}
-          >
-            + Activate Warranty
-          </Button>
-        )}
+        {booking?.serviceId?.supportsWarranty === false ? (
+          <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 font-semibold">
+            No warranty applicable
+          </span>
+        ) : (
+          <>
+            {!warranty && (isProvider || isCustomer || isAdmin) && ['CUSTOMER_VERIFIED', 'CUSTOMER_CONFIRMED', 'WORK_COMPLETED', 'INVOICED', 'COMPLETED'].includes(booking?.status) && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => setAssignModalOpen(true)}
+              >
+                + Activate Warranty
+              </Button>
+            )}
 
-        {warranty && warranty.status === 'ACTIVE' && isCustomer && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="text-amber-600 border-amber-300 hover:bg-amber-50"
-            onClick={() => setClaimModalOpen(true)}
-          >
-            File Warranty Claim
-          </Button>
+            {warranty && warranty.status === 'ACTIVE' && isCustomer && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-amber-600 border-amber-300 hover:bg-amber-50"
+                onClick={() => setClaimModalOpen(true)}
+              >
+                File Warranty Claim
+              </Button>
+            )}
+          </>
         )}
       </div>
 
       {loading ? (
         <div className="py-6 text-center text-xs text-slate-500">Checking warranty status...</div>
+      ) : booking?.serviceId?.supportsWarranty === false ? (
+        <div className="py-6 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 mt-4">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            No warranty applicable
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+            This service category does not include a post-service warranty policy.
+          </p>
+        </div>
       ) : !warranty ? (
         <div className="py-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 mt-4">
           <div className="text-3xl mb-1">🛡️</div>

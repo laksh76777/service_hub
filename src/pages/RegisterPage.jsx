@@ -60,8 +60,14 @@ const RegisterPage = () => {
     setTechStep(1);
   };
 
+  const redirectParam = searchParams.get('redirect');
+
   useEffect(() => {
     if (isAuthenticated && mongoUser && !successState) {
+      if (redirectParam) {
+        navigate(redirectParam, { replace: true });
+        return;
+      }
       if (mongoUser.role === 'TECHNICIAN' || mongoUser.role === 'PROVIDER') {
         navigate('/technician/dashboard', { replace: true });
       } else if (mongoUser.role === 'ADMIN') {
@@ -70,7 +76,7 @@ const RegisterPage = () => {
         navigate('/dashboard', { replace: true });
       }
     }
-  }, [isAuthenticated, mongoUser, navigate, successState]);
+  }, [isAuthenticated, mongoUser, navigate, successState, redirectParam]);
 
   const validateCustomerFields = () => {
     if (!fullName.trim()) return 'Please enter your full legal name.';
@@ -114,15 +120,16 @@ const RegisterPage = () => {
         phone: phone.trim()
       });
 
+      const dest = redirectParam || '/dashboard';
       setSuccessState({
         title: 'Account Created Successfully!',
         message: 'Welcome to ServiceHub. Your customer account is ready.',
-        destination: '/dashboard'
+        destination: dest
       });
 
       setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 1500);
+        navigate(dest, { replace: true });
+      }, 1200);
     } catch (err) {
       let msg = 'Failed to create customer account. Please try again.';
       if (err.code === 'auth/email-already-in-use') {

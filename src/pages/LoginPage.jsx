@@ -36,7 +36,11 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const from = location.state?.from?.pathname || null;
+  const searchParams = new URLSearchParams(location.search);
+  const redirectParam = searchParams.get('redirect') || location.state?.from?.pathname || null;
+  const reasonParam = searchParams.get('reason');
+
+  const [directLoggingEmail, setDirectLoggingEmail] = useState('');
 
   const getRoleDashboard = (role) => {
     const r = (role || '').toUpperCase();
@@ -57,14 +61,34 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (isAuthenticated && mongoUser) {
-      navigate(from || getRoleDashboard(mongoUser.role), { replace: true });
+      navigate(redirectParam || getRoleDashboard(mongoUser.role), { replace: true });
     }
-  }, [isAuthenticated, mongoUser, navigate, from]);
+  }, [isAuthenticated, mongoUser, navigate, redirectParam]);
 
   const handleQuickFill = (demoEmail) => {
     setEmail(demoEmail);
     setPassword('123456');
     setErrorMessage('');
+  };
+
+  const handleDirectLogin = async (demoEmail, demoPassword = '123456') => {
+    setEmail(demoEmail);
+    setPassword(demoPassword);
+    setErrorMessage('');
+    setSuccessMessage('');
+    setDirectLoggingEmail(demoEmail);
+    setLoading(true);
+
+    try {
+      const { profile } = await login(demoEmail, demoPassword);
+      const dest = redirectParam || getRoleDashboard(profile?.role || 'CUSTOMER');
+      navigate(dest, { replace: true });
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to sign in with demo account.');
+    } finally {
+      setLoading(false);
+      setDirectLoggingEmail('');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -81,7 +105,7 @@ const LoginPage = () => {
 
     try {
       const { profile } = await login(email.trim(), password);
-      const dest = from || getRoleDashboard(profile?.role || 'CUSTOMER');
+      const dest = redirectParam || getRoleDashboard(profile?.role || 'CUSTOMER');
       navigate(dest, { replace: true });
     } catch (err) {
       let msg = 'Failed to sign in. Please check your credentials.';
@@ -149,6 +173,18 @@ const LoginPage = () => {
             }
             subtitle="Sign in to your account to manage bookings, jobs, or estimates."
           >
+            {reasonParam === 'service_request' && (
+              <div className="mb-5 p-4 rounded-2xl bg-blue-50 border border-blue-200 text-blue-900 text-xs flex items-start gap-2.5">
+                <span className="text-base flex-shrink-0">🔐</span>
+                <div className="space-y-1">
+                  <p className="font-bold">Sign in to request home service</p>
+                  <p className="text-blue-700">
+                    Please sign in with your customer account, or use <strong>1-Click Demo Customer</strong> on the right to test immediately.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {errorMessage && (
               <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2" role="alert">
                 <span className="font-bold">Error:</span> {errorMessage}
@@ -181,7 +217,7 @@ const LoginPage = () => {
                       setResetEmail(email);
                       setShowResetModal(true);
                     }}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold"
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
                   >
                     Forgot Password?
                   </button>
@@ -211,10 +247,10 @@ const LoginPage = () => {
                   type="submit"
                   variant="primary"
                   fullWidth
-                  className="py-2.5 shadow-sm text-sm font-bold"
+                  className="py-2.5 shadow-sm text-sm font-bold cursor-pointer"
                   disabled={loading}
                 >
-                  {loading ? 'Signing in...' : 'Sign In'}
+                  {loading && !directLoggingEmail ? 'Signing in...' : 'Sign In'}
                 </Button>
               </div>
             </form>
@@ -222,7 +258,7 @@ const LoginPage = () => {
             {/* Links: Create Customer Account & Register as Technician */}
             <div className="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
               <Link
-                to="/register?role=CUSTOMER"
+                to={`/register?role=CUSTOMER${redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : ''}`}
                 className="text-blue-600 font-semibold hover:underline flex items-center gap-1.5"
               >
                 <span>👤</span>
@@ -246,27 +282,42 @@ const LoginPage = () => {
             <span className="text-xl">⚡</span>
             <div>
               <h3 className="text-sm font-bold text-white tracking-tight">1-Click Demo Accounts</h3>
-              <p className="text-[11px] text-slate-400">Click any role to autofill and test immediately</p>
+              <p className="text-[11px] text-slate-400">Click Log In to access instantly, or Autofill</p>
             </div>
           </div>
 
-          <div className="space-y-2 pt-1">
+          <div className="space-y-2.5 pt-1">
             {demoAccounts.map((acc) => (
-              <button
+              <div
                 key={acc.email}
-                type="button"
-                onClick={() => handleQuickFill(acc.email)}
-                className="w-full text-left p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-400/50 transition-all duration-150 flex flex-col gap-0.5 group cursor-pointer"
+                className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-150 flex flex-col gap-1.5 group"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-white">
                     {acc.label}
                   </span>
-                  <span className="text-[10px] text-blue-400 font-mono">Autofill →</span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickFill(acc.email)}
+                      className="text-[10px] text-slate-400 hover:text-slate-200 underline cursor-pointer"
+                      title="Fill email and password into form"
+                    >
+                      Autofill
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleDirectLogin(acc.email)}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-600 hover:bg-blue-500 active:scale-95 text-white transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                    >
+                      {directLoggingEmail === acc.email ? 'Logging in...' : '⚡ Log In'}
+                    </button>
+                  </div>
                 </div>
                 <span className="text-[11px] text-slate-400 font-mono">{acc.email}</span>
-                <span className="text-[10px] text-slate-500 mt-0.5">{acc.desc}</span>
-              </button>
+                <span className="text-[10px] text-slate-500">{acc.desc}</span>
+              </div>
             ))}
           </div>
 

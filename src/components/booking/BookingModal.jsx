@@ -268,6 +268,53 @@ const BookingModal = ({
 
   if (!isOpen) return null;
 
+  if (isOpen && !user) {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Sign In Required"
+        subtitle="Please log in to send a service appointment request"
+      >
+        <div className="py-6 text-center space-y-4">
+          <div className="h-16 w-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-3xl font-bold mx-auto shadow-2xs">
+            🔐
+          </div>
+          <div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">Customer Account Required</h3>
+            <p className="text-xs text-slate-600 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              To send service requests to verified technicians, approve digital estimates, and access 30-day warranties, please sign in with your customer account.
+            </p>
+          </div>
+          <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button
+              variant="primary"
+              size="md"
+              className="w-full sm:w-auto font-bold cursor-pointer"
+              onClick={() => {
+                onClose();
+                navigate('/login?redirect=' + encodeURIComponent(window.location.pathname) + '&reason=service_request');
+              }}
+            >
+              Sign In with Customer Account
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full sm:w-auto cursor-pointer"
+              onClick={() => {
+                onClose();
+                navigate('/register?role=CUSTOMER&redirect=' + encodeURIComponent(window.location.pathname));
+              }}
+            >
+              Create Account
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
     <Modal
       isOpen={isOpen}

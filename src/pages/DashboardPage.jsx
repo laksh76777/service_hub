@@ -24,12 +24,19 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
   }, [mongoUser, navigate]);
 
   const [activeTab, setActiveTab] = useState(urlTab || initialTab);
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     if (urlTab) {
       setActiveTab(urlTab);
     }
   }, [urlTab]);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   const [bookings, setBookings] = useState([]);
   const [savedAddresses, setSavedAddresses] = useState([]);
@@ -141,7 +148,38 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 gap-2 pb-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+            activeTab === 'overview'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('bookings')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition cursor-pointer ${
+            activeTab === 'bookings'
+              ? 'bg-slate-900 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          My Bookings ({bookings.length})
+        </button>
+        <button
+          onClick={() => setShowProfileModal(true)}
+          className="px-4 py-2 text-xs font-bold rounded-xl transition text-slate-600 hover:bg-slate-100 cursor-pointer"
+        >
+          Profile &amp; Addresses
+        </button>
+      </div>
+
       {/* 2. QUICK ACTIONS BAR (Requirement 16) */}
+      {activeTab === 'overview' && (
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <button
           type="button"
@@ -161,10 +199,7 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
 
         <button
           type="button"
-          onClick={() => {
-            const el = document.getElementById('bookings-section');
-            if (el) el.scrollIntoView({ behavior: 'smooth' });
-          }}
+          onClick={() => setActiveTab('bookings')}
           className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-blue-300 hover:shadow-xs transition-all text-left flex items-center gap-3.5 group cursor-pointer"
         >
           <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
@@ -194,8 +229,11 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
           </div>
         </button>
       </div>
+      )}
 
       {/* 3. ACTIVE BOOKING SECTION (Requirement 15 & 16) */}
+      {activeTab === 'overview' && (
+      <>
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -227,7 +265,13 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
                 title={b.serviceId?.name || 'Home Service'}
                 subtitle={`Booking #${b.bookingNumber}`}
                 badge={
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-blue-100 text-blue-800">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                    b.status === 'REQUESTED'
+                      ? 'bg-amber-100 text-amber-800 border-amber-300'
+                      : b.status === 'ACCEPTED' || b.status === 'SCHEDULED'
+                      ? 'bg-blue-100 text-blue-800 border-blue-300'
+                      : 'bg-slate-100 text-slate-800 border-slate-300'
+                  }`}>
                     {b.status.replace(/_/g, ' ')}
                   </span>
                 }
@@ -236,7 +280,7 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
                     <span className="text-xs font-bold text-slate-700">
                       ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
                     </span>
-                    <Link to={`/bookings/${b._id}`}>
+                    <Link to={`/customer/bookings/${b._id}`}>
                       <Button size="sm" variant="outline">
                         View Details &amp; Status →
                       </Button>
@@ -306,7 +350,7 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
                       </p>
                     </div>
                   </div>
-                  <Link to={`/bookings/${u._id}`}>
+                  <Link to={`/customer/bookings/${u._id}`}>
                     <Button size="xs" variant="outline">
                       Manage →
                     </Button>
@@ -385,7 +429,7 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
                     <span className="text-xs text-slate-500">
                       {new Date(b.createdAt).toLocaleDateString('en-IN')}
                     </span>
-                    <Link to={`/bookings/${b._id}`}>
+                    <Link to={`/customer/bookings/${b._id}`}>
                       <Button size="xs" variant="outline">
                         View Invoice &rarr;
                       </Button>
@@ -412,6 +456,128 @@ const DashboardPage = ({ initialTab = 'overview' }) => {
           </div>
         )}
       </section>
+      </>
+      )}
+
+      {/* DEDICATED MY BOOKINGS VIEW (Requirement 17) */}
+      {activeTab === 'bookings' && (
+        <section className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">My Bookings</h2>
+              <p className="text-xs text-slate-500">View and track all service requests and appointments belonging to your account.</p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => setShowBookingModal(true)}
+              className="font-bold"
+            >
+              + Book New Service
+            </Button>
+          </div>
+
+          {/* Status Filter Tabs */}
+          <div className="flex flex-wrap gap-2 items-center">
+            {['ALL', 'REQUESTED', 'ACCEPTED', 'COMPLETED', 'REJECTED'].map((st) => (
+              <button
+                key={st}
+                onClick={() => setStatusFilter(st)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  statusFilter === st
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {st === 'ALL' ? `All (${bookings.length})` : st}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <SkeletonCard />
+          ) : bookings.filter(b => statusFilter === 'ALL' || b.status === statusFilter || (statusFilter === 'ACCEPTED' && ['ACCEPTED', 'SCHEDULED'].includes(b.status))).length === 0 ? (
+            <EmptyState
+              icon="📋"
+              title="No bookings found"
+              description={statusFilter === 'ALL' ? "You haven't requested any services yet." : `No bookings currently in '${statusFilter}' status.`}
+              actionLabel="Book a Service"
+              onAction={() => setShowBookingModal(true)}
+            />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {bookings
+                .filter(b => statusFilter === 'ALL' || b.status === statusFilter || (statusFilter === 'ACCEPTED' && ['ACCEPTED', 'SCHEDULED'].includes(b.status)))
+                .map((b) => (
+                  <Card
+                    key={b._id}
+                    title={
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-base text-slate-900">{b.serviceId?.name || 'Home Service'}</span>
+                      </div>
+                    }
+                    subtitle={`Ref: ${b.bookingNumber}`}
+                    badge={
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                        b.status === 'REQUESTED'
+                          ? 'bg-amber-100 text-amber-800 border-amber-300'
+                          : b.status === 'ACCEPTED' || b.status === 'SCHEDULED'
+                          ? 'bg-blue-100 text-blue-800 border-blue-300'
+                          : b.status === 'REJECTED' || b.status === 'CANCELLED'
+                          ? 'bg-rose-100 text-rose-800 border-rose-300'
+                          : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      }`}>
+                        {b.status.replace(/_/g, ' ')}
+                      </span>
+                    }
+                    footer={
+                      <div className="flex items-center justify-between w-full pt-1 border-t border-slate-100">
+                        <span className="text-xs text-slate-400">
+                          Booked: {new Date(b.createdAt).toLocaleDateString('en-IN')}
+                        </span>
+                        <Link to={`/customer/bookings/${b._id}`}>
+                          <Button size="sm" variant="outline">
+                            View Details &amp; Status →
+                          </Button>
+                        </Link>
+                      </div>
+                    }
+                  >
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Technician:</span>
+                        <span className="font-bold text-slate-800">
+                          {b.technicianId?.name || b.providerId?.name || 'Assigned Pro'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Requested Date/Time:</span>
+                        <span className="text-slate-700 font-semibold">
+                          {new Date(b.scheduledDate).toLocaleDateString('en-IN', {
+                            day: 'numeric',
+                            month: 'short',
+                            year: 'numeric'
+                          })}
+                          {b.preferredTimeSlot ? ` (${b.preferredTimeSlot})` : ''}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-400 font-medium">Location Summary:</span>
+                        <span className="text-slate-700 text-right max-w-[220px] truncate">
+                          {b.address?.addressLine1 || b.address?.streetAddress}, {b.address?.city}
+                        </span>
+                      </div>
+                      <div className="pt-1.5 border-t border-slate-100">
+                        <span className="text-slate-400 font-medium block">Problem Description:</span>
+                        <p className="text-slate-700 italic line-clamp-2 mt-0.5">"{b.problemDescription}"</p>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Profile Edit Modal */}
       <Modal

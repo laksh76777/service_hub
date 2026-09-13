@@ -12,10 +12,15 @@ import {
   updateBookingStatus
 } from '../services/api';
 
-const ProviderDashboardPage = () => {
+const ProviderDashboardPage = ({ initialTab = 'overview' }) => {
   const { user, mongoUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   // Bookings state
   const [bookings, setBookings] = useState([]);
@@ -198,7 +203,52 @@ const ProviderDashboardPage = () => {
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-200 gap-2 pb-1 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab('overview')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'overview'
+              ? 'bg-slate-900 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          onClick={() => setActiveTab('requests')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'requests'
+              ? 'bg-slate-900 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Requests ({incomingRequests.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('jobs')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'jobs'
+              ? 'bg-slate-900 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Active Jobs ({activeJobs.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('earnings')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+            activeTab === 'earnings'
+              ? 'bg-slate-900 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          Earnings
+        </button>
+      </div>
+
       {/* 3. NEW REQUESTS SECTION (Requirement 23 & 24) */}
+      {(activeTab === 'overview' || activeTab === 'requests') && (
       <section id="requests" className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
@@ -226,7 +276,7 @@ const ProviderDashboardPage = () => {
                 subtitle={`Booking Ref: ${b.bookingNumber}`}
                 footer={
                   <div className="flex items-center justify-between w-full pt-1">
-                    <Link to={`/bookings/${b._id}`}>
+                    <Link to={`/technician/jobs/${b._id}`}>
                       <Button size="xs" variant="outline">
                         Inspect
                       </Button>
@@ -290,8 +340,10 @@ const ProviderDashboardPage = () => {
           </div>
         )}
       </section>
+      )}
 
       {/* 4. TODAY'S JOBS SECTION (Requirement 23) */}
+      {(activeTab === 'overview' || activeTab === 'jobs') && (
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
@@ -329,7 +381,7 @@ const ProviderDashboardPage = () => {
                   </p>
                 </div>
                 <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                  <Link to={`/bookings/${j._id}`}>
+                  <Link to={`/technician/jobs/${j._id}`}>
                     <Button size="xs" variant="primary">
                       Manage Job →
                     </Button>
@@ -340,8 +392,10 @@ const ProviderDashboardPage = () => {
           </div>
         )}
       </section>
+      )}
 
       {/* 5. ACTIVE JOBS SECTION (Requirement 23 & 25) */}
+      {(activeTab === 'overview' || activeTab === 'jobs') && (
       <section id="jobs" className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
@@ -369,7 +423,7 @@ const ProviderDashboardPage = () => {
                     <span className="text-xs font-bold text-slate-800">
                       ₹{b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0}
                     </span>
-                    <Link to={`/bookings/${b._id}`}>
+                    <Link to={`/technician/jobs/${b._id}`}>
                       <Button size="xs" variant="primary">
                         Job Lifecycle &rarr;
                       </Button>
@@ -400,8 +454,10 @@ const ProviderDashboardPage = () => {
           </div>
         )}
       </section>
+      )}
 
       {/* 6. RECENT COMPLETED JOBS (Requirement 23) */}
+      {(activeTab === 'overview' || activeTab === 'jobs') && (
       <section className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <div>
@@ -430,7 +486,7 @@ const ProviderDashboardPage = () => {
                     {c.customerId?.name} • ₹{c.pricing?.finalTotal || c.pricing?.estimatedTotal || 0}
                   </p>
                 </div>
-                <Link to={`/bookings/${c._id}`}>
+                <Link to={`/technician/jobs/${c._id}`}>
                   <Button size="xs" variant="outline">
                     View &rarr;
                   </Button>
@@ -440,6 +496,48 @@ const ProviderDashboardPage = () => {
           </div>
         )}
       </section>
+      )}
+
+      {/* 7. EARNINGS TAB */}
+      {(activeTab === 'overview' || activeTab === 'earnings') && (
+      <section id="earnings" className="space-y-4 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900 tracking-tight">Earnings &amp; Payouts</h2>
+            <p className="text-xs text-slate-500">Breakdown of gross revenue, completed invoices, and platform settlement.</p>
+          </div>
+          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
+            ₹{completedJobs.reduce((acc, b) => acc + (b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0), 0)} Total
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-5 rounded-3xl border border-slate-200">
+            <span className="text-xs font-bold text-slate-400 uppercase">Gross Service Invoiced</span>
+            <div className="text-2xl font-black text-slate-900 mt-1">
+              ₹{completedJobs.reduce((acc, b) => acc + (b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0), 0)}
+            </div>
+            <span className="text-[11px] text-slate-500 mt-0.5 block">{completedJobs.length} completed jobs</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200">
+            <span className="text-xs font-bold text-slate-400 uppercase">Net Technician Share (90%)</span>
+            <div className="text-2xl font-black text-emerald-600 mt-1">
+              ₹{Math.round(completedJobs.reduce((acc, b) => acc + (b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0), 0) * 0.9)}
+            </div>
+            <span className="text-[11px] text-slate-500 mt-0.5 block">Direct bank settlement</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-3xl border border-slate-200">
+            <span className="text-xs font-bold text-slate-400 uppercase">Active In-Pipeline Value</span>
+            <div className="text-2xl font-black text-blue-600 mt-1">
+              ₹{activeJobs.reduce((acc, b) => acc + (b.pricing?.finalTotal || b.pricing?.estimatedTotal || 0), 0)}
+            </div>
+            <span className="text-[11px] text-slate-500 mt-0.5 block">{activeJobs.length} in progress jobs</span>
+          </div>
+        </div>
+      </section>
+      )}
 
       {/* Rejection Modal with Mandatory Reason (Requirement 24) */}
       <Modal

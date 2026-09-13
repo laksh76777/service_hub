@@ -38,6 +38,21 @@ const INDIAN_STATES = [
 
 const PINCODE_REGEX = /^[1-9][0-9]{5}$/;
 
+export const getTechnicianId = (tech) => {
+  if (!tech) return '';
+  if (typeof tech === 'string') return tech;
+  return (
+    tech.technicianId?.toString() ||
+    tech.userId?._id?.toString() ||
+    tech.userId?.toString() ||
+    tech.user?._id?.toString() ||
+    tech.user?.toString() ||
+    tech.id?.toString() ||
+    tech._id?.toString() ||
+    ''
+  );
+};
+
 const BookingModal = ({
   isOpen,
   onClose,
@@ -60,6 +75,7 @@ const BookingModal = ({
   // Selections
   const [selectedService, setSelectedService] = useState(initialService || null);
   const [selectedTechnician, setSelectedTechnician] = useState(initialProvider || null);
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState(getTechnicianId(initialProvider));
 
   // Problem description
   const [problemDescription, setProblemDescription] = useState('');
@@ -72,8 +88,8 @@ const BookingModal = ({
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
   const [locality, setLocality] = useState('');
-  const [city, setCity] = useState('Bengaluru');
-  const [state, setState] = useState('Karnataka');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
   const [saveToProfile, setSaveToProfile] = useState(false);
 
@@ -130,8 +146,8 @@ const BookingModal = ({
     setAddressLine1(addr.addressLine1 || addr.streetAddress || '');
     setAddressLine2(addr.addressLine2 || addr.unit || '');
     setLocality(addr.locality || '');
-    setCity(addr.city || 'Bengaluru');
-    setState(addr.state || 'Karnataka');
+    setCity(addr.city || '');
+    setState(addr.state || '');
     setPincode(addr.pincode || addr.zipCode || '');
   };
 
@@ -151,6 +167,7 @@ const BookingModal = ({
     }
     if (initialProvider) {
       setSelectedTechnician(initialProvider);
+      setSelectedTechnicianId(getTechnicianId(initialProvider));
     }
   }, [initialService, initialProvider]);
 
@@ -163,6 +180,7 @@ const BookingModal = ({
           setTechnicians(list);
           if (list.length > 0 && !selectedTechnician) {
             setSelectedTechnician(list[0]);
+            setSelectedTechnicianId(getTechnicianId(list[0]));
           }
         })
         .catch(console.error);
@@ -190,11 +208,7 @@ const BookingModal = ({
       return;
     }
 
-    const techId =
-      selectedTechnician?.userId?._id?.toString() ||
-      selectedTechnician?.userId?.toString() ||
-      selectedTechnician?.id?.toString() ||
-      selectedTechnician?._id?.toString();
+    const techId = selectedTechnicianId || getTechnicianId(selectedTechnician);
 
     if (!selectedService?._id || !techId) {
       setError('Service and technician are required.');
@@ -353,7 +367,7 @@ const BookingModal = ({
               size="sm"
               onClick={() => {
                 onClose();
-                navigate(`/bookings/${requestSuccess.bookingId}`);
+                navigate(`/customer/bookings/${requestSuccess.bookingId}`);
               }}
             >
               View Booking Details →
@@ -441,13 +455,18 @@ const BookingModal = ({
               ) : (
                 <div className="space-y-2.5">
                   {technicians.map((tech) => {
-                    const techId = tech.userId?._id || tech.id || tech._id;
-                    const isSelected = (selectedTechnician?.userId?._id || selectedTechnician?.id || selectedTechnician?._id) === techId;
+                    const techId = getTechnicianId(tech);
+                    const isSelected =
+                      (selectedTechnicianId && selectedTechnicianId === techId) ||
+                      (getTechnicianId(selectedTechnician) === techId);
                     return (
                       <button
-                        key={techId}
+                        key={techId || tech.profileId || tech.id || tech._id}
                         type="button"
-                        onClick={() => setSelectedTechnician(tech)}
+                        onClick={() => {
+                          setSelectedTechnician(tech);
+                          setSelectedTechnicianId(techId);
+                        }}
                         className={`w-full p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
                           isSelected
                             ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20 shadow-xs'
@@ -627,6 +646,7 @@ const BookingModal = ({
                       onChange={(e) => setState(e.target.value)}
                       className="w-full p-2.5 text-xs rounded-xl border border-slate-300 bg-white"
                     >
+                      <option value="">Select State</option>
                       {INDIAN_STATES.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
@@ -637,7 +657,7 @@ const BookingModal = ({
                     value={pincode}
                     maxLength={6}
                     onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="560038"
+                    placeholder="e.g. 110001, 560038"
                     required
                   />
                 </div>
@@ -650,7 +670,7 @@ const BookingModal = ({
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={!addressLine1.trim() || !pincode.trim()}
+                  disabled={!addressLine1.trim() || !city.trim() || !state.trim() || !pincode.trim()}
                   onClick={() => setStep(5)}
                 >
                   Schedule →
@@ -717,7 +737,7 @@ const BookingModal = ({
                 6. Review Booking Summary
               </label>
 
-              {/* Exact Summary Panel: Service, Technician, Date, Time, Location */}
+              {/* Exact Summary Panel: Service, Technician, Problem, Date, Time, Location */}
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2.5">
                 <div className="flex justify-between pb-2 border-b border-slate-200/80">
                   <span className="text-slate-400 font-medium">Service:</span>
@@ -727,6 +747,12 @@ const BookingModal = ({
                   <span className="text-slate-400 font-medium">Technician:</span>
                   <span className="font-bold text-slate-900">
                     {selectedTechnician?.name || selectedTechnician?.businessName}
+                  </span>
+                </div>
+                <div className="flex justify-between pb-2 border-b border-slate-200/80">
+                  <span className="text-slate-400 font-medium">Problem:</span>
+                  <span className="font-medium text-slate-800 text-right max-w-[240px] italic line-clamp-3">
+                    "{problemDescription}"
                   </span>
                 </div>
                 <div className="flex justify-between pb-2 border-b border-slate-200/80">
@@ -740,7 +766,7 @@ const BookingModal = ({
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-medium">Location:</span>
                   <span className="font-medium text-slate-700 text-right max-w-[240px]">
-                    {addressLine1}, {locality ? `${locality}, ` : ''}{city} - {pincode}
+                    {addressLine1}, {locality ? `${locality}, ` : ''}{city}, {state} - {pincode}
                   </span>
                 </div>
               </div>

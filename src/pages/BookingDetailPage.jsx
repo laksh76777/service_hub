@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getBookingById, updateBookingStatus, rescheduleBooking } from '../services/api';
+import { getBookingById, updateBookingStatus, rescheduleBooking, startInspection, saveInspection } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import BookingTimeline from '../components/booking/BookingTimeline';
 import JobExecutionCard from '../components/booking/JobExecutionCard';
@@ -43,6 +43,17 @@ const BookingDetailPage = () => {
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
 
+  // Phase 5 Inspection Form States
+  const [inspectionForm, setInspectionForm] = useState({
+    observedIssue: '',
+    inspectionNotes: '',
+    requiredWork: '',
+    partsRequired: '',
+    additionalNotes: ''
+  });
+  const [savingInspection, setSavingInspection] = useState(false);
+  const [startingInspection, setStartingInspection] = useState(false);
+
   const fetchBooking = async () => {
     try {
       setLoading(true);
@@ -58,6 +69,45 @@ const BookingDetailPage = () => {
   useEffect(() => {
     fetchBooking();
   }, [id]);
+
+  useEffect(() => {
+    if (booking) {
+      setInspectionForm({
+        observedIssue: booking.inspection?.observedIssue || booking.jobExecution?.observedIssue || booking.jobExecution?.problemIdentified || '',
+        inspectionNotes: booking.inspection?.inspectionNotes || booking.jobExecution?.inspectionNotes || '',
+        requiredWork: booking.inspection?.requiredWork || booking.jobExecution?.requiredWork || '',
+        partsRequired: booking.inspection?.partsRequired || booking.jobExecution?.partsRequired || '',
+        additionalNotes: booking.inspection?.additionalNotes || booking.jobExecution?.additionalNotes || ''
+      });
+    }
+  }, [booking]);
+
+  const handleStartInspection = async () => {
+    setStartingInspection(true);
+    try {
+      const res = await startInspection(id);
+      setBooking(res.data.booking);
+      setActionNotice('Diagnostic inspection started. Record your findings below.');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to start inspection.');
+    } finally {
+      setStartingInspection(false);
+    }
+  };
+
+  const handleSaveInspection = async (e) => {
+    e?.preventDefault();
+    setSavingInspection(true);
+    try {
+      const res = await saveInspection(id, inspectionForm);
+      setBooking(res.data.booking);
+      setActionNotice('Inspection findings recorded successfully.');
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || 'Failed to save inspection findings.');
+    } finally {
+      setSavingInspection(false);
+    }
+  };
 
   const isCustomer =
     booking?.customerId?._id?.toString() === mongoUser?._id?.toString() ||
@@ -145,7 +195,7 @@ const BookingDetailPage = () => {
           <h2 className="text-lg font-bold text-red-800">Booking Access Error</h2>
           <p className="text-xs text-red-600 mt-2">{error || 'Booking not found.'}</p>
           <div className="mt-4">
-            <Link to="/dashboard">
+            <Link to={mongoUser?.role === 'TECHNICIAN' || mongoUser?.role === 'PROVIDER' ? "/technician/dashboard" : mongoUser?.role === 'ADMIN' ? "/admin/dashboard" : "/customer/dashboard"}>
               <Button size="sm" variant="primary">Return to Dashboard</Button>
             </Link>
           </div>
@@ -249,18 +299,20 @@ const BookingDetailPage = () => {
               </div>
               <p className="text-xs text-blue-700 mt-0.5">
                 {isCustomer
-                  ? `${techName} accepted your request. Preparing for on-site inspection & scheduling.`
-                  : `You accepted this request. Full customer address is now unlocked.`}
+                  ? `${techName} accepted your request. Full service location unlocked for on-site visit.`
+                  : `You accepted this booking. Full customer location is unlocked. Start diagnostic inspection when ready.`}
               </p>
             </div>
             <div className="flex gap-2">
-              {(isTechnician || isAdmin) && (
+              {isTechnician && (
                 <Button
                   size="sm"
                   variant="primary"
-                  onClick={() => handleOpenAction('SCHEDULED', 'Confirm Schedule', 'Confirm this appointment time slot with the customer?')}
+                  loading={startingInspection}
+                  disabled={startingInspection}
+                  onClick={handleStartInspection}
                 >
-                  Confirm Schedule
+                  {startingInspection ? 'Starting...' : 'Start Inspection'}
                 </Button>
               )}
             </div>
@@ -299,13 +351,15 @@ const BookingDetailPage = () => {
                 Scheduled for {new Date(booking.scheduledDate).toLocaleDateString('en-IN')} ({booking.preferredTimeSlot || 'Standard hours'}).
               </p>
             </div>
-            {(isTechnician || isAdmin) && (
+            {isTechnician && (
               <Button
                 size="sm"
                 variant="primary"
-                onClick={() => handleOpenAction('INSPECTION', 'Start Inspection', 'Check in on-site to start diagnostic inspection?')}
+                loading={startingInspection}
+                disabled={startingInspection}
+                onClick={handleStartInspection}
               >
-                Start Inspection
+                {startingInspection ? 'Starting...' : 'Start Inspection'}
               </Button>
             )}
           </div>
@@ -315,16 +369,16 @@ const BookingDetailPage = () => {
         return (
           <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-cyan-900">
-                🔍 On-Site Diagnostic Inspection
+              <div className="text-sm font-bold text-cyan-900 flex items-center gap-2">
+                <span>🔍</span> Technician is inspecting the service
               </div>
               <p className="text-xs text-cyan-700 mt-0.5">
                 {isCustomer
                   ? `${techName} is conducting on-site diagnostic inspection.`
-                  : 'Diagnostic inspection underway. Prepare and submit estimate below.'}
+                  : 'Diagnostic inspection underway. Record findings below and create an estimate.'}
               </p>
             </div>
-            {(isTechnician || isAdmin) && (
+            {isTechnician && (
               <Button
                 size="sm"
                 variant="primary"
@@ -333,7 +387,7 @@ const BookingDetailPage = () => {
                   if (estElem) estElem.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
-                Submit Estimate &darr;
+                Create Estimate &darr;
               </Button>
             )}
           </div>
@@ -341,17 +395,29 @@ const BookingDetailPage = () => {
 
       case 'ESTIMATE_PENDING':
         return (
-          <div className="p-5 rounded-2xl bg-cyan-50 border border-cyan-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-cyan-900">
-                📝 Estimate Pending
+              <div className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <span>📝</span> Estimate Pending / Changes Requested
               </div>
-              <p className="text-xs text-cyan-700 mt-0.5">
+              <p className="text-xs text-amber-700 mt-0.5">
                 {isCustomer
-                  ? 'Technician is drafting scope and parts pricing for your approval.'
-                  : 'Draft scope and pricing in the Estimate section below.'}
+                  ? 'Technician is revising scope and pricing per your requested changes.'
+                  : 'Customer requested changes or estimate is pending. Create and submit revised estimate below.'}
               </p>
             </div>
+            {isTechnician && (
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => {
+                  const estElem = document.getElementById('estimate-manager-section');
+                  if (estElem) estElem.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                Submit Revised Estimate &darr;
+              </Button>
+            )}
           </div>
         );
 
@@ -359,13 +425,13 @@ const BookingDetailPage = () => {
         return (
           <div className="p-5 rounded-2xl bg-violet-50 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-violet-900">
-                📋 Review Estimate
+              <div className="text-sm font-bold text-violet-900 flex items-center gap-2">
+                <span>📋</span> Estimate Available
               </div>
               <p className="text-xs text-violet-700 mt-0.5">
                 {isCustomer
-                  ? 'Technician submitted an estimate. Please review and approve.'
-                  : 'Waiting for customer approval of submitted estimate.'}
+                  ? `${techName} submitted an estimate. Please review line items and approve or request changes below.`
+                  : 'Estimate submitted to customer. Waiting for customer approval.'}
               </p>
             </div>
             {isCustomer && (
@@ -384,43 +450,25 @@ const BookingDetailPage = () => {
         );
 
       case 'ESTIMATE_APPROVED':
-        return (
-          <div className="p-5 rounded-2xl bg-violet-50 border border-violet-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
-            <div>
-              <div className="text-sm font-bold text-violet-900">
-                ✓ Estimate Approved
-              </div>
-              <p className="text-xs text-violet-700 mt-0.5">
-                Estimate approved for ₹{amount}. Ready for payment / work.
-              </p>
-            </div>
-            {(isTechnician || isAdmin) && (
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => handleOpenAction('PAYMENT_PENDING', 'Request Payment', 'Request payment from the customer before initiating work?')}
-              >
-                Proceed to Payment
-              </Button>
-            )}
-          </div>
-        );
-
       case 'PAYMENT_PENDING':
         return (
-          <div className="p-5 rounded-2xl bg-orange-50 border border-orange-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
+          <div className="p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-orange-900">
-                💳 Payment Required
+              <div className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                <span>💳</span> Payment Required
               </div>
-              <p className="text-xs text-orange-700 mt-0.5">
-                Amount payable: <span className="font-extrabold text-sm text-slate-900">₹{amount}</span>
+              <p className="text-xs text-amber-800 mt-0.5">
+                Approved estimate total: <span className="font-extrabold text-sm text-slate-900">₹{amount}</span>. Please complete payment to authorize service execution.
               </p>
             </div>
             {isCustomer && (
-              <Link to={`/checkout/${booking._id}`}>
-                <Button size="sm" variant="primary" className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                  Pay ₹{amount} Now &rarr;
+              <Link to={`/customer/bookings/${booking._id}/payment`}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold whitespace-nowrap shadow-sm shadow-emerald-600/20"
+                >
+                  Proceed to Payment &rarr;
                 </Button>
               </Link>
             )}
@@ -431,22 +479,27 @@ const BookingDetailPage = () => {
         return (
           <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 shadow-sm">
             <div>
-              <div className="text-sm font-bold text-emerald-900">
-                ✓ Payment Verified
+              <div className="text-sm font-bold text-emerald-950 flex items-center gap-2">
+                <span className="text-emerald-600 font-bold text-base">✓</span> Payment Successful
               </div>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                Payment completed. Technician will start work.
+              <p className="text-xs text-emerald-800 mt-0.5">
+                Payment verified in DEMO mode. Service authorized. Amount: <span className="font-bold text-slate-900">₹{amount}</span>.
               </p>
             </div>
-            {(isTechnician || isAdmin) && (
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => handleOpenAction('WORK_IN_PROGRESS', 'Start Work', 'Commence work on this service order?')}
-              >
-                Start Work (In Progress)
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
+              <div className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-3 py-1.5 rounded-xl border border-emerald-200">
+                Demo Settled
+              </div>
+              {(isTechnician || isAdmin) && (
+                <Button
+                  size="sm"
+                  variant="primary"
+                  onClick={() => handleOpenAction('WORK_IN_PROGRESS', 'Start Work', 'Commence work on this service order?')}
+                >
+                  Start Work (In Progress)
+                </Button>
+              )}
+            </div>
           </div>
         );
 
@@ -558,7 +611,7 @@ const BookingDetailPage = () => {
       {/* Breadcrumb navigation */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Link to="/dashboard" className="hover:text-blue-600">Dashboard</Link>
+          <Link to={isTechnician ? "/technician/dashboard" : isAdmin ? "/admin/dashboard" : "/customer/dashboard"} className="hover:text-blue-600">Dashboard</Link>
           <span>/</span>
           <span className="font-semibold text-slate-800">{booking.bookingNumber}</span>
         </div>
@@ -680,6 +733,180 @@ const BookingDetailPage = () => {
                   {booking.address?.city}, {booking.address?.state} - {booking.address?.pincode || booking.address?.zipCode}
                 </p>
               </div>
+            </div>
+          </Card>
+
+          {/* Phase 5: Diagnostic Inspection & Findings */}
+          <Card title="Diagnostic Inspection & Findings">
+            <div className="space-y-4 text-xs">
+              {/* Customer Problem Description - Immutable & clearly distinct */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200">
+                <span className="text-slate-400 font-bold uppercase block text-[10px] mb-1 tracking-wider">
+                  Customer's Problem Description (Original — Unchanged)
+                </span>
+                <p className="text-sm font-semibold text-slate-800">
+                  "{booking.problemDescription}"
+                </p>
+              </div>
+
+              {/* Technician Diagnostic Form (Active for assigned technician in ACCEPTED or INSPECTION) */}
+              {isTechnician && ['ACCEPTED', 'INSPECTION', 'ESTIMATE_PENDING'].includes(booking.status) && (
+                <div className="p-4 bg-cyan-50/60 border border-cyan-200 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-cyan-950 uppercase tracking-wide">
+                      🔍 Technician Inspection Form
+                    </span>
+                    {booking.status === 'ACCEPTED' && (
+                      <Button
+                        size="xs"
+                        variant="primary"
+                        loading={startingInspection}
+                        disabled={startingInspection}
+                        onClick={handleStartInspection}
+                      >
+                        Start Inspection First
+                      </Button>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSaveInspection} className="space-y-3 pt-1">
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Observed Issue *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={inspectionForm.observedIssue}
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, observedIssue: e.target.value })}
+                        placeholder="e.g. Outdoor unit capacitor is weak."
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Inspection Notes *
+                      </label>
+                      <textarea
+                        rows={2}
+                        required
+                        value={inspectionForm.inspectionNotes}
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, inspectionNotes: e.target.value })}
+                        placeholder="e.g. AC runs normally but cooling performance is poor."
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-semibold text-slate-700 mb-1">
+                        Required Work *
+                      </label>
+                      <textarea
+                        rows={2}
+                        required
+                        value={inspectionForm.requiredWork}
+                        onChange={(e) => setInspectionForm({ ...inspectionForm, requiredWork: e.target.value })}
+                        placeholder="e.g. Replace capacitor and clean filters."
+                        className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-cyan-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Parts Required
+                        </label>
+                        <input
+                          type="text"
+                          value={inspectionForm.partsRequired}
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, partsRequired: e.target.value })}
+                          placeholder="e.g. 1 × AC capacitor"
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-cyan-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">
+                          Additional Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={inspectionForm.additionalNotes}
+                          onChange={(e) => setInspectionForm({ ...inspectionForm, additionalNotes: e.target.value })}
+                          placeholder="e.g. Unit should be tested after replacement."
+                          className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:ring-2 focus:ring-cyan-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end pt-1">
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="primary"
+                        loading={savingInspection}
+                        disabled={savingInspection}
+                      >
+                        {savingInspection ? 'Saving...' : 'Save Inspection Findings'}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* Recorded Diagnostic Findings (Visible to Customer, Technician & Admin) */}
+              {(booking.inspection?.observedIssue || booking.inspection?.inspectionNotes || booking.jobExecution?.observedIssue || booking.jobExecution?.inspectionNotes) && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <span className="font-bold text-slate-900">
+                      Technician Diagnostic Findings
+                    </span>
+                    {(booking.inspection?.inspectedAt || booking.jobExecution?.inspectedAt) && (
+                      <span className="text-[11px] text-slate-400">
+                        {new Date(booking.inspection?.inspectedAt || booking.jobExecution?.inspectedAt).toLocaleString('en-IN')}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase block text-[10px]">Observed Issue</span>
+                      <p className="text-xs font-semibold text-slate-800">
+                        {booking.inspection?.observedIssue || booking.jobExecution?.observedIssue || booking.jobExecution?.problemIdentified || 'N/A'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase block text-[10px]">Parts Required</span>
+                      <p className="text-xs font-semibold text-slate-800">
+                        {booking.inspection?.partsRequired || booking.jobExecution?.partsRequired || 'None specified'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase block text-[10px]">Inspection Notes</span>
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                      {booking.inspection?.inspectionNotes || booking.jobExecution?.inspectionNotes || 'N/A'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase block text-[10px]">Required Work</span>
+                    <p className="text-xs text-slate-700 whitespace-pre-wrap">
+                      {booking.inspection?.requiredWork || booking.jobExecution?.requiredWork || 'N/A'}
+                    </p>
+                  </div>
+
+                  {(booking.inspection?.additionalNotes || booking.jobExecution?.additionalNotes) && (
+                    <div>
+                      <span className="text-slate-400 font-bold uppercase block text-[10px]">Additional Notes</span>
+                      <p className="text-xs text-slate-600 italic">
+                        {booking.inspection?.additionalNotes || booking.jobExecution?.additionalNotes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
 

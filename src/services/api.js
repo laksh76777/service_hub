@@ -80,6 +80,8 @@ export const updateBookingStatus = (id, data) => api.patch(`/bookings/${id}/stat
 export const rescheduleBooking = (id, data) => api.patch(`/bookings/${id}/reschedule`, data);
 export const verifyBookingOtp = (id, data) => api.post(`/bookings/${id}/verify-otp`, data);
 export const updateJobExecution = (id, data) => api.patch(`/bookings/${id}/job-execution`, data);
+export const startInspection = (id) => api.patch(`/technician/jobs/${id}/start-inspection`);
+export const saveInspection = (id, data) => api.patch(`/technician/jobs/${id}/inspection`, data);
 
 // Saved Addresses APIs
 export const getMyAddresses = () => api.get('/addresses');
@@ -135,8 +137,8 @@ export const resolveDispute = (disputeId, data) => api.patch(`/disputes/${disput
 // Review APIs (Phase 9)
 export const createReview = (data) => api.post('/reviews', data);
 export const getBookingReview = (bookingId) => api.get(`/reviews/booking/${bookingId}`);
-export const getTechnicianReviews = (technicianId) => api.get(`/reviews/provider/${technicianId}`);
-export const getProviderReviews = (providerId) => api.get(`/reviews/provider/${providerId}`);
+export const getTechnicianReviews = (technicianId) => api.get(`/reviews/technician/${technicianId}`);
+export const getProviderReviews = (providerId) => api.get(`/reviews/technician/${providerId}`);
 
 // Notification APIs (Phase 9)
 export const getNotifications = (params = {}) => api.get('/notifications', { params });
@@ -174,6 +176,7 @@ export const adminGetInvoices = () => api.get('/admin/invoices');
 export const adminGetReviews = () => api.get('/admin/reviews');
 export const adminGetDisputes = () => api.get('/admin/disputes');
 export const adminGetReports = () => api.get('/admin/reports');
+export const adminGetProfile = () => api.get('/admin/profile');
 
 // Demo Accounts API
 export const getDemoAccounts = () => api.get('/test/demo-accounts');

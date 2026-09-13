@@ -73,7 +73,7 @@ const RegisterPage = () => {
       } else if (mongoUser.role === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true });
       } else {
-        navigate('/dashboard', { replace: true });
+        navigate('/customer/dashboard', { replace: true });
       }
     }
   }, [isAuthenticated, mongoUser, navigate, successState, redirectParam]);
@@ -120,7 +120,7 @@ const RegisterPage = () => {
         phone: phone.trim()
       });
 
-      const dest = redirectParam || '/dashboard';
+      const dest = redirectParam || '/customer/dashboard';
       setSuccessState({
         title: 'Account Created Successfully!',
         message: 'Welcome to ServiceHub. Your customer account is ready.',

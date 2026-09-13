@@ -111,24 +111,18 @@ const PaymentHistoryCard = ({ bookingId, refreshTrigger }) => {
                   <span className="font-bold text-gray-900 dark:text-white text-sm">
                     ₹{p.amount?.toLocaleString('en-IN') || 0}
                   </span>
-                  <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                    {p.gateway || 'DEMO'} GATEWAY
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200">
+                    Payment Mode: {p.provider || p.gateway || 'DEMO'}
                   </span>
                   {getStatusBadge(p.status)}
                 </div>
 
                 <div className="text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px]">
-                  {p.transactionId ? (
-                    <span>
-                      Txn ID: <strong className="font-mono text-gray-700 dark:text-gray-300">{p.transactionId}</strong>
-                    </span>
-                  ) : p.gatewayOrderId ? (
-                    <span>
-                      Order ID: <strong className="font-mono text-gray-700 dark:text-gray-300">{p.gatewayOrderId}</strong>
-                    </span>
-                  ) : null}
+                  <span>
+                    Reference: <strong className="font-mono text-blue-600 dark:text-blue-400 font-bold">{p.paymentReference || p.transactionId || p.gatewayOrderId || 'N/A'}</strong>
+                  </span>
                   <span>•</span>
-                  <span>{new Date(p.createdAt).toLocaleString('en-IN')}</span>
+                  <span>Date: {new Date(p.paidAt || p.createdAt).toLocaleString('en-IN')}</span>
                 </div>
 
                 {p.failureReason && (

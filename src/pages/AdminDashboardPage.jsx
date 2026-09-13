@@ -27,11 +27,11 @@ import {
   adminAiSummary
 } from '../services/api';
 
-const AdminDashboardPage = () => {
+const AdminDashboardPage = ({ initialTab = 'overview' }) => {
   const { mongoUser } = useAuth();
   const location = useLocation();
 
-  // Tab State (sync with hash if provided)
+  // Tab State (sync with hash or prop if provided)
   const getInitialTab = () => {
     const hash = location.hash.replace('#', '').toLowerCase();
     const validTabs = [
@@ -44,12 +44,21 @@ const AdminDashboardPage = () => {
       'invoices',
       'reviews',
       'disputes',
-      'reports'
+      'reports',
+      'profile'
     ];
-    return validTabs.includes(hash) ? hash : 'overview';
+    if (validTabs.includes(hash)) return hash;
+    if (validTabs.includes(initialTab)) return initialTab;
+    return 'overview';
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab);
+
+  useEffect(() => {
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     const hash = location.hash.replace('#', '').toLowerCase();
@@ -403,7 +412,8 @@ const AdminDashboardPage = () => {
             { id: 'invoices', label: '🧾 Invoices' },
             { id: 'reviews', label: '⭐ Reviews' },
             { id: 'disputes', label: '⚖️ Disputes' },
-            { id: 'reports', label: '📈 Reports' }
+            { id: 'reports', label: '📈 Reports' },
+            { id: 'profile', label: '🛡️ Profile' }
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1231,6 +1241,72 @@ const AdminDashboardPage = () => {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 11. PROFILE TAB */}
+      {/* ========================================================================= */}
+      {activeTab === 'profile' && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Administrator Credentials &amp; Profile</h2>
+            <p className="text-xs text-slate-500">Master platform access and role-based administration.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card title="System Administrator" subtitle="Authorized platform control account">
+              <div className="space-y-4 text-xs">
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Administrator Name:</span>
+                  <span className="font-bold text-slate-900">{mongoUser?.name || 'ServiceHub Admin'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Master Email:</span>
+                  <span className="font-mono text-indigo-700 font-bold">{mongoUser?.email || 'abc@gmail.com'}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Role:</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-200">
+                    ADMIN
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                  <span className="text-slate-500 font-medium">Security Clearance:</span>
+                  <span className="text-emerald-700 font-semibold">Tier 1 Full Platform Access</span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-slate-500 font-medium">Database:</span>
+                  <span className="text-slate-700 font-mono">MongoDB Atlas (Encrypted TLS)</span>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Administrative Capabilities" subtitle="Protected backend operations">
+              <div className="space-y-3 text-xs text-slate-600">
+                <div className="flex items-start gap-2.5">
+                  <span className="text-purple-600 font-bold">✓</span>
+                  <span><strong>Technician Verification:</strong> Review, verify, or suspend contractor profiles.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-purple-600 font-bold">✓</span>
+                  <span><strong>Catalog Management:</strong> Create, edit, and toggle platform home services.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-purple-600 font-bold">✓</span>
+                  <span><strong>Financial Ledger:</strong> Monitor escrow payments, service fees, and invoices.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-purple-600 font-bold">✓</span>
+                  <span><strong>Dispute Resolution:</strong> Authoritative mediation between customers and technicians.</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="text-purple-600 font-bold">✓</span>
+                  <span><strong>Security Audit:</strong> Real-time cross-role authorization and audit logging.</span>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       )}
 

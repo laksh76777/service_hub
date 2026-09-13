@@ -26,9 +26,21 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
               !
             </div>
             <h2 className="text-xl font-bold text-slate-900 mb-2">Access Restricted</h2>
-            <p className="text-sm text-slate-600 mb-4">
-              Your account role ({role}) does not have permission to view this section. Allowed roles: {allowedRoles.join(', ')}.
+            <p className="text-sm text-slate-600 mb-6">
+              Your account role ({role || 'NONE'}) does not have permission to view this section.
             </p>
+            <a
+              href={
+                (role || '').toUpperCase() === 'ADMIN'
+                  ? '/admin/dashboard'
+                  : (role || '').toUpperCase() === 'TECHNICIAN'
+                  ? '/technician/dashboard'
+                  : '/customer/dashboard'
+              }
+              className="inline-block px-5 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition"
+            >
+              Go to Your Dashboard &rarr;
+            </a>
           </div>
         </div>
       );

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { uploadBookingEvidence, getBookingEvidence, deleteBookingEvidence } from '../../services/api';
+import { uploadBookingEvidence, getBookingEvidence, deleteBookingEvidence, getApiBaseUrl } from '../../services/api';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import Modal from '../common/Modal';
@@ -80,10 +80,6 @@ const WorkEvidenceGallery = ({ bookingId, canUpload = true, canDelete = true }) 
     } catch (err) {
       alert(err.message || 'Failed to delete file.');
     }
-  };
-
-  const getApiBaseUrl = () => {
-    return import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
   };
 
   return (

@@ -1,8 +1,12 @@
 import axios from 'axios';
 import { auth } from '../config/firebase';
 
+export const getApiBaseUrl = () => {
+  return import.meta.env.VITE_API_URL || 'https://service-hub-backend-usb0.onrender.com/api';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   headers: {
     'Content-Type': 'application/json'
   }
@@ -128,7 +132,7 @@ export const rejectEstimate = (estimateId, data) => api.patch(`/estimates/${esti
 export const generateInvoice = (bookingId) => api.post(`/bookings/${bookingId}/invoices`);
 export const getBookingInvoice = (bookingId) => api.get(`/bookings/${bookingId}/invoices`);
 export const getInvoicePdfUrl = (invoiceId) => {
-  const base = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const base = getApiBaseUrl();
   return `${base}/invoices/${invoiceId}/pdf`;
 };
 
